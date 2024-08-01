@@ -1,14 +1,19 @@
 {
-  "name": "my-threejs-app",
+  "name": "restaurant-3d",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@react-three/drei": "^9.109.2",
+    "@react-three/fiber": "^8.16.8",
+    "@react-three/postprocessing": "^2.16.2",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "lodash": "^4.17.21",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",
+    "three": "^0.167.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -34,5 +39,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   }
 }
