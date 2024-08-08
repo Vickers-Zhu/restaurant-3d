@@ -13,7 +13,7 @@ function App() {
         <Sky />
         <Bvh firstHitOnly>
           <Selection>
-            {/* <Effects /> */}
+            <Effects />
             <Model rotation={[0, Math.PI / 2, 0]} position={[0, -1, -0.85]} />
           </Selection>
         </Bvh>
@@ -31,7 +31,7 @@ function Effects() {
   })
   return (
     <EffectComposer stencilBuffer disableNormalPass autoClear={false} multisampling={4}>
-      <N8AO halfRes aoSamples={5} aoRadius={0.4} distanceFalloff={0.75} intensity={1} />
+      {/* <N8AO halfRes aoSamples={5} aoRadius={0.4} distanceFalloff={0.75} intensity={1} /> */}
       <Outline visibleEdgeColor="white" hiddenEdgeColor="white" blur width={size.width * 1.25} edgeStrength={10} />
       <TiltShift2 samples={5} blur={0.1} />
       <ToneMapping />
