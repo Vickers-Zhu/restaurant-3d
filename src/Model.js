@@ -1,55 +1,116 @@
-import { useState, useCallback } from "react"
-import { debounce } from "lodash"
-import { useGLTF, useEnvironment, Text } from "@react-three/drei"
-import { Select } from "@react-three/postprocessing"
+// Model.js
+import React, { useState, useCallback, useRef } from "react";
+import { debounce } from "lodash";
+import { useGLTF } from "@react-three/drei";
+import { Select, EffectComposer, Outline, ToneMapping } from "@react-three/postprocessing";
+import { useThree } from "@react-three/fiber";
 
+export function Model({ ...props }) {
+  const { nodes, materials } = useGLTF("/kitchen.glb");
+  const groupRef = useRef();
 
-export function Model(props) {
-  const { nodes, materials } = useGLTF("/kitchen-transformed.glb")
-  console.log(nodes)
-  // Load environment (using it only on the chairs, for reflections)
-  const env = useEnvironment({ preset: "city" })
-  // Hover state
-  const [hovered, hover] = useState(null)
-  // Debounce hover a bit to stop the ticker from being erratic
-  const debouncedHover = useCallback(debounce(hover, 30), [])
-  const over = (name) => (e) => (e.stopPropagation(), debouncedHover(name))
-  // Get the priced item
+  const [hovered, setHovered] = useState(null);
+  const [clicked, setClicked] = useState([]);
+
+  const debouncedHover = useCallback(debounce((name) => {
+    setHovered(name);
+  }, 30), []);
+
+  const handlePointerOver = useCallback(
+    (name) => (e) => {
+      e.stopPropagation();
+      debouncedHover(name); // Set the name of the hovered chair
+    },
+    [debouncedHover]
+  );
+
+  const handlePointerOut = useCallback(() => {
+    debouncedHover(null);
+  }, [debouncedHover]);
+
+  const handleClick = useCallback(
+    (name) => (e) => {
+      e.stopPropagation();
+      setClicked((prev) => {
+        if (prev.includes(name)) {
+          return prev.filter(item => item !== name); // Remove if already clicked
+        } else {
+          return [...prev, name]; // Add to clicked array
+        }
+      });
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'chairClicked', name }));
+      }
+    },
+    []
+  );
+
+  const { size } = useThree();
+
+  // Determine the color of the outline based on the hover and click states
+  const getOutlineColor = (name) => {
+    if (hovered === name) return 'white'; // White outline if hovered
+    if (clicked.includes(name)) return 'red'; // Red outline if clicked
+    return null; // No outline if not hovered or clicked
+  };
+
   return (
-    <>
-      <group {...props}>
-        <mesh geometry={nodes.vase1.geometry} material={materials.gray} material-envMap={env} />
-        <mesh geometry={nodes.bottle.geometry} material={materials.gray} material-envMap={env} />
-        <mesh geometry={nodes.walls_1.geometry} material={materials.floor} />
-        <mesh geometry={nodes.walls_2.geometry} material={materials.walls} />
-        <mesh geometry={nodes.plant_1.geometry} material={materials.potted_plant_01_leaves} />
-        <mesh geometry={nodes.plant_2.geometry} material={materials.potted_plant_01_pot} />
-        <mesh geometry={nodes.cuttingboard.geometry} material={materials.walls} />
-        <mesh geometry={nodes.bowl.geometry} material={materials.walls} />
-        <Select enabled={hovered === "BRÖNDEN"} onPointerOver={over("BRÖNDEN")} onPointerOut={() => debouncedHover(null)}>
-          <mesh geometry={nodes.carpet.geometry} material={materials.carpet} />
+    <group ref={groupRef} {...props}>
+      <EffectComposer
+        stencilBuffer
+        disableNormalPass
+        autoClear={false}
+        multisampling={2}
+      >
+        {Array.from({ length: 6 }, (_, i) => {
+          const chairName = `CHAIR${i + 1}`;
+          const outlineColor = getOutlineColor(chairName);
+
+          return (
+            outlineColor && (
+              <Outline
+                key={chairName}
+                visibleEdgeColor={outlineColor}
+                hiddenEdgeColor={outlineColor}
+                blur
+                edgeStrength={20}
+                width={size.width * 1.25}
+              />
+            )
+          );
+        })}
+        <ToneMapping />
+      </EffectComposer>
+
+      <mesh geometry={nodes.vase1.geometry} material={materials.gray} />
+      <mesh geometry={nodes.bottle.geometry} material={materials.gray} />
+      <mesh geometry={nodes.walls_1.geometry} material={materials.floor} />
+      <mesh geometry={nodes.plant_1.geometry} material={materials.potted_plant_01_leaves} />
+      <mesh geometry={nodes.plant_2.geometry} material={materials.potted_plant_01_pot} />
+      <mesh geometry={nodes.cuttingboard.geometry} material={materials.walls} />
+      <mesh geometry={nodes.bowl.geometry} material={materials.walls} />
+      <mesh geometry={nodes.carpet.geometry} material={materials.carpet} />
+      <mesh geometry={nodes.table.geometry} material={materials.walls} />
+
+      {/* Chairs with interaction and selection */}
+      {Array.from({ length: 6 }, (_, i) => (
+        <Select
+          key={`CHAIR${i + 1}`}
+          enabled={hovered === `CHAIR${i + 1}` || clicked.includes(`CHAIR${i + 1}`)}
+          onPointerOver={handlePointerOver(`CHAIR${i + 1}`)}
+          onPointerOut={handlePointerOut}
+          onClick={handleClick(`CHAIR${i + 1}`)}
+        >
+          <mesh geometry={nodes[`chairs00${i + 1}_1`].geometry} material={materials.walls} />
+          <mesh geometry={nodes[`chairs00${i + 1}_2`].geometry} material={materials.plastic} />
         </Select>
-        <Select enabled={hovered === "VOXLÖV"} onPointerOver={over("VOXLÖV")} onPointerOut={() => debouncedHover(null)}>
-          <mesh geometry={nodes.table.geometry} material={materials.walls} material-envMap={env} material-envMapIntensity={0.5} />
-        </Select>
-        <Select enabled={hovered === "FANBYN"} onPointerOver={over("FANBYN")} onPointerOut={() => debouncedHover(null)}>
-          <mesh geometry={nodes.chairs_1.geometry} material={materials.walls} />
-          <mesh geometry={nodes.chairs_2.geometry} material={materials.plastic} material-color="#1a1a1a" material-envMap={env} />
-        </Select>
-        <Select enabled={hovered === "LIVSVERK"} onPointerOver={over("LIVSVERK")} onPointerOut={() => debouncedHover(null)}>
-          <mesh geometry={nodes.vase.geometry} material={materials.gray} material-envMap={env} />
-        </Select>
-        <Select enabled={hovered === "SKAFTET"} onPointerOver={over("SKAFTET")} onPointerOut={() => debouncedHover(null)}>
-          <mesh geometry={nodes.lamp_socket.geometry} material={materials.gray} material-envMap={env} />
-          <mesh geometry={nodes.lamp.geometry} material={materials.gray} />
-          <mesh geometry={nodes.lamp_cord.geometry} material={materials.gray} material-envMap={env} />
-        </Select>
-        <mesh geometry={nodes.kitchen.geometry} material={materials.walls} />
-        <mesh geometry={nodes.sink.geometry} material={materials.chrome} material-envMap={env} />
-      </group>
-      {/** Forward the price to the ticker component */}
-    </>
-  )
+      ))}
+
+      <mesh geometry={nodes.vase.geometry} material={materials.gray} />
+      <mesh geometry={nodes.kitchen.geometry} material={materials.walls} />
+      <mesh geometry={nodes.sink.geometry} material={materials.chrome} />
+    </group>
+  );
 }
 
-useGLTF.preload('/kitchen-transformed.glb')
+useGLTF.preload('/kitchen.glb');
