@@ -1,44 +1,28 @@
-// App.js
-// Removed React import assuming React version ≥ 17
-import { useEffect } from "react";
-import { Scene } from "./Scene"; // Import the Scene component
+// src/App.js
+import React, { useState } from "react";
+import { Scene } from "./components/Scene";
+import { useReactNativeMessaging } from "./hooks/useReactNativeMessaging";
+import { useContentHeight } from "./hooks/useContentHeight";
 
 function App() {
-  // Function to send the content's height to React Native
-  const sendHeight = () => {
-    const height = document.body.scrollHeight;
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({ type: "contentHeight", height })
-    );
-  };
+  const [selectedChairs, setSelectedChairs] = useState([]);
 
-  useEffect(() => {
-    // Send initial height on mount
-    sendHeight();
+  // Custom hook to handle messaging with React Native
+  const { notifyInteractionStart, notifyInteractionEnd } =
+    useReactNativeMessaging(setSelectedChairs);
 
-    // Send height on window resize
-    window.addEventListener("resize", sendHeight);
-
-    // Observe DOM mutations to handle dynamic content changes
-    const observer = new MutationObserver(sendHeight);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-    });
-
-    // Cleanup on unmount
-    return () => {
-      window.removeEventListener("resize", sendHeight);
-      observer.disconnect();
-    };
-  }, []);
+  // Custom hook to send content height to React Native
+  useContentHeight();
 
   return (
-    <div style={{ width: "100%" }}>
-      {" "}
-      {/* Removed height: '100vh' */}
-      <Scene />
+    <div
+      style={{ width: "100%" }}
+      onTouchStart={notifyInteractionStart}
+      onTouchEnd={notifyInteractionEnd}
+      onMouseDown={notifyInteractionStart}
+      onMouseUp={notifyInteractionEnd}
+    >
+      <Scene selectedChairs={selectedChairs} />
     </div>
   );
 }
