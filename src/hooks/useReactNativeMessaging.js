@@ -1,7 +1,10 @@
 // src/hooks/useReactNativeMessaging.js
 import { useEffect, useCallback } from "react";
 
-export const useReactNativeMessaging = (setSelectedChairs) => {
+export const useReactNativeMessaging = (
+  setSelectedChairs,
+  setOccupiedChairs
+) => {
   // Function to send messages to React Native
   const postMessageToRN = useCallback((message) => {
     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
@@ -20,16 +23,20 @@ export const useReactNativeMessaging = (setSelectedChairs) => {
   }, [postMessageToRN]);
 
   useEffect(() => {
-    // Function to receive selected chairs from React Native
-    window.updateSelectedChairs = (selectedChairsFromRN) => {
-      setSelectedChairs(selectedChairsFromRN);
+    // Function to receive chairs data from React Native
+    window.updateChairs = ({
+      selectedChairs: selected,
+      occupiedChairs: occupied,
+    }) => {
+      setSelectedChairs(selected);
+      setOccupiedChairs(occupied);
     };
 
     // Cleanup
     return () => {
-      delete window.updateSelectedChairs;
+      delete window.updateChairs;
     };
-  }, [setSelectedChairs]);
+  }, [setSelectedChairs, setOccupiedChairs]);
 
   return {
     notifyInteractionStart,

@@ -6,13 +6,15 @@ import { useContentHeight } from "./hooks/useContentHeight";
 
 function App() {
   const [selectedChairs, setSelectedChairs] = useState([]);
+  const [occupiedChairs, setOccupiedChairs] = useState([]);
 
   // Custom hook to handle messaging with React Native
   const { notifyInteractionStart, notifyInteractionEnd } =
-    useReactNativeMessaging(setSelectedChairs);
+    useReactNativeMessaging(setSelectedChairs, setOccupiedChairs);
 
   // Custom hook to send content height to React Native
   useContentHeight();
+  
 
   return (
     <div
@@ -22,7 +24,7 @@ function App() {
       onMouseDown={notifyInteractionStart}
       onMouseUp={notifyInteractionEnd}
     >
-      <Scene selectedChairs={selectedChairs} />
+      <Scene selectedChairs={selectedChairs} occupiedChairs={occupiedChairs} />
     </div>
   );
 }
