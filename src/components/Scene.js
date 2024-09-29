@@ -3,7 +3,8 @@ import React, { useState, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Sky, Bvh, OrbitControls } from "@react-three/drei";
 import { Selection } from "@react-three/postprocessing";
-import { Model } from "./Model"; // Ensure this path is correct for your project structure
+// import { Model } from "./Model"; // Ensure this path is correct for your project structure
+import { Model } from "./Model/Model"; // Import Model component
 import { EffectComposer, Bloom } from "@react-three/postprocessing"; // Import Bloom for visual enhancements
 
 export function Scene({ selectedChairs, occupiedChairs }) {
