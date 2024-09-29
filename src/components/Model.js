@@ -1,16 +1,12 @@
-// web-app/src/components/Model.js
+// src/web-app/src/components/Model.js
 import React, { useState, useCallback, useRef } from "react";
 import { debounce } from "lodash";
 import { useGLTF } from "@react-three/drei";
-import {
-  Select,
-  EffectComposer,
-  Outline,
-  ToneMapping,
-} from "@react-three/postprocessing";
-import { useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+import { EffectComposer, Outline, ToneMapping } from "@react-three/postprocessing";
 
-export function Model({ selectedChairs, ...props }) {
+export function Model({ selectedChairs, onSelectChair, ...props }) {
   const { nodes, materials } = useGLTF("/kitchen.glb");
   const groupRef = useRef();
 
@@ -36,56 +32,64 @@ export function Model({ selectedChairs, ...props }) {
   }, [debouncedHover]);
 
   const handleClick = useCallback(
-    (name) => (e) => {
+    (chairName) => (e) => {
       e.stopPropagation();
-      // Toggle chair selection and send message to React Native
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({ type: "chairClicked", name })
-        );
+      // Invoke the passed callback to update selected chairs
+      if (onSelectChair) {
+        onSelectChair(chairName);
       }
     },
-    []
+    [onSelectChair]
   );
 
-  const { size } = useThree();
+  // For breathing effect
+  const clock = useRef(new THREE.Clock());
 
-  // Determine the color of the outline based on the hover and selected states
-  const getOutlineColor = (name) => {
-    if (hovered === name) return "white"; // White outline if hovered
-    if (selectedChairs.includes(name)) return "red"; // Red outline if selected
-    return null; // No outline if not hovered or selected
-  };
+  // Define a ref for each chair to animate
+  const chairRefs = useRef({});
+
+  // Predefine emissive materials to avoid creating them every frame
+  const emissiveColor = new THREE.Color(0x00ff00); // Green color
+
+  const emissiveMaterialWalls = new THREE.MeshStandardMaterial({
+    ...materials.walls,
+    emissive: emissiveColor,
+    emissiveIntensity: 0.5,
+  });
+
+  const emissiveMaterialPlastic = new THREE.MeshStandardMaterial({
+    ...materials.plastic,
+    emissive: emissiveColor,
+    emissiveIntensity: 0.5,
+  });
+
+  useFrame(() => {
+    const elapsed = clock.current.getElapsedTime();
+    selectedChairs.forEach((chairName) => {
+      const mesh = chairRefs.current[chairName];
+      if (mesh) {
+        // Breathing scale between 1 and 1.05
+        const scale = 1 + 0.05 * Math.sin(elapsed * 2); // Adjust speed as needed
+        mesh.scale.set(scale, scale, scale);
+      }
+    });
+  });
+
+  const isSelected = (chairName) => selectedChairs.includes(chairName);
 
   return (
     <group ref={groupRef} {...props}>
-      <EffectComposer
-        stencilBuffer
-        disableNormalPass
-        autoClear={false}
-        multisampling={2}
-      >
-        {Array.from({ length: 6 }, (_, i) => {
-          const chairName = `CHAIR${i + 1}`;
-          const outlineColor = getOutlineColor(chairName);
-
-          return (
-            outlineColor && (
-              <Outline
-                key={chairName}
-                visibleEdgeColor={outlineColor}
-                hiddenEdgeColor={outlineColor}
-                blur
-                edgeStrength={20}
-                width={size.width * 1.25}
-              />
-            )
-          );
-        })}
+      <EffectComposer>
+        <Outline
+          selection={[...selectedChairs]}
+          edgeStrength={10}
+          visibleEdgeColor={emissiveColor}
+          hiddenEdgeColor={emissiveColor}
+        />
         <ToneMapping />
       </EffectComposer>
 
-      {/* Other meshes */}
+      {/* Static meshes */}
       <mesh geometry={nodes.vase1.geometry} material={materials.gray} />
       <mesh geometry={nodes.bottle.geometry} material={materials.gray} />
       <mesh geometry={nodes.walls_1.geometry} material={materials.floor} />
@@ -105,28 +109,33 @@ export function Model({ selectedChairs, ...props }) {
       <mesh geometry={nodes.kitchen.geometry} material={materials.walls} />
       <mesh geometry={nodes.sink.geometry} material={materials.chrome} />
 
-      {/* Chairs with interaction and selection */}
+      {/* Chairs with interaction, selection, and effects */}
       {Array.from({ length: 6 }, (_, i) => {
         const chairName = `CHAIR${i + 1}`;
         return (
-          <Select
+          <mesh
             key={chairName}
-            enabled={
-              hovered === chairName || selectedChairs.includes(chairName)
+            geometry={nodes[`chairs00${i + 1}_1`].geometry}
+            material={
+              isSelected(chairName)
+                ? emissiveMaterialWalls
+                : materials.walls
             }
             onPointerOver={handlePointerOver(chairName)}
             onPointerOut={handlePointerOut}
             onClick={handleClick(chairName)}
+            ref={(mesh) => (chairRefs.current[chairName] = mesh)} // Assign ref
           >
-            <mesh
-              geometry={nodes[`chairs00${i + 1}_1`].geometry}
-              material={materials.walls}
-            />
+            {/* Inner mesh */}
             <mesh
               geometry={nodes[`chairs00${i + 1}_2`].geometry}
-              material={materials.plastic}
+              material={
+                isSelected(chairName)
+                  ? emissiveMaterialPlastic
+                  : materials.plastic
+              }
             />
-          </Select>
+          </mesh>
         );
       })}
     </group>
