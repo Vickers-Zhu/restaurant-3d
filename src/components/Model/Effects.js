@@ -8,40 +8,37 @@ import {
 import * as THREE from "three";
 
 /**
- * Effects component to apply post-processing effects like outlines and tone mapping.
- *
- * @param {object} props - Component props.
- * @returns {JSX.Element} - Rendered effects.
+ * Visual effects for highlighting selected and occupied items
  */
 const Effects = ({
-  selectedChairs,
-  occupiedChairs,
-  emissiveColorSelected,
-  emissiveColorOccupied,
+  selectedItems,
+  occupiedItems,
+  selectionColor,
+  occupiedColor,
 }) => {
-  const isSelected = (name) => selectedChairs.includes(name);
-  const isOccupied = (name) => occupiedChairs.includes(name);
+  const isSelected = (name) => selectedItems.includes(name);
+  const isOccupied = (name) => occupiedItems.includes(name);
 
   return (
     <EffectComposer>
       <Outline
-        selection={[...selectedChairs, ...occupiedChairs]}
+        selection={[...selectedItems, ...occupiedItems]}
         edgeStrength={10}
         visibleEdgeColor={(obj) => {
           const name = obj.name;
           if (isSelected(name)) {
-            return emissiveColorSelected;
+            return selectionColor;
           } else if (isOccupied(name)) {
-            return emissiveColorOccupied;
+            return occupiedColor;
           }
           return new THREE.Color(0x000000);
         }}
         hiddenEdgeColor={(obj) => {
           const name = obj.name;
           if (isSelected(name)) {
-            return emissiveColorSelected;
+            return selectionColor;
           } else if (isOccupied(name)) {
-            return emissiveColorOccupied;
+            return occupiedColor;
           }
           return new THREE.Color(0x000000);
         }}

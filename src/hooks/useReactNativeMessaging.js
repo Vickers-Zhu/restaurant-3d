@@ -1,44 +1,49 @@
 // src/hooks/useReactNativeMessaging.js
 import { useEffect, useCallback } from "react";
 
-export const useReactNativeMessaging = (
-  setSelectedChairs,
-  setOccupiedChairs
-) => {
-  // Function to send messages to React Native
+/**
+ * Hook for handling communication with React Native WebView
+ */
+export const useReactNativeMessaging = (setSelectedItems, setOccupiedItems) => {
+  // Function to post messages to React Native WebView
   const postMessageToRN = useCallback((message) => {
     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
       window.ReactNativeWebView.postMessage(JSON.stringify(message));
     }
   }, []);
 
-  // Notify React Native about interaction start
+  // Notify React Native when user starts interacting with 3D scene
   const notifyInteractionStart = useCallback(() => {
     postMessageToRN({ type: "interactionStart" });
   }, [postMessageToRN]);
 
-  // Notify React Native about interaction end
+  // Notify React Native when user stops interacting with 3D scene
   const notifyInteractionEnd = useCallback(() => {
     postMessageToRN({ type: "interactionEnd" });
   }, [postMessageToRN]);
 
+  // Setup global method for React Native to update selected/occupied items
   useEffect(() => {
-    // Function to receive chairs data from React Native
-    window.updateChairs = ({
-      selectedChairs: selected,
-      occupiedChairs: occupied,
+    // Method for React Native to update selected and occupied items
+    window.updateItems = ({
+      selectedItems: selected,
+      occupiedItems: occupied,
     }) => {
-      setSelectedChairs(selected);
-      setOccupiedChairs(occupied);
+      if (Array.isArray(selected)) {
+        setSelectedItems(selected);
+      }
+      if (Array.isArray(occupied)) {
+        setOccupiedItems(occupied);
+      }
     };
 
-    // Cleanup
     return () => {
-      delete window.updateChairs;
+      delete window.updateItems;
     };
-  }, [setSelectedChairs, setOccupiedChairs]);
+  }, [setSelectedItems, setOccupiedItems]);
 
   return {
+    postMessageToRN,
     notifyInteractionStart,
     notifyInteractionEnd,
   };

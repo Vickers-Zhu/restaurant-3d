@@ -1,0 +1,262 @@
+# Example: Adding a Custom Restaurant Model
+
+This guide shows the complete process of adding a new restaurant model to the system.
+
+## 1. Prepare the 3D Model
+
+For this example, we'll assume you've created a model called "beachside_cafe.glb" with:
+
+- 8 tables with 4 chairs each
+- A bar area with 6 bar stools
+- A patio section with 4 lounge chairs
+
+## 2. Create the Model Configuration
+
+Create a new file `src/configs/BeachsideCafeConfig.js`:
+
+```javascript
+// src/configs/BeachsideCafeConfig.js
+import * as THREE from "three";
+import { RestaurantModelConfig } from "./ModelConfig";
+
+export const beachsideCafeConfig = new RestaurantModelConfig({
+  modelPath: "/beachside_cafe.glb",
+  initialCameraPosition: [0, 15, 15],
+  cameraFov: 50,
+  
+  // Define all selectable items
+  selectableItems: [
+    // Indoor tables (8 tables, 4 chairs each)
+    ...Array.from({ length: 8 }, (_, tableIndex) =>
+      Array.from({ length: 4 }, (_, chairIndex) => ({
+        type: "chair",
+        id: `TABLE${tableIndex + 1}_CHAIR${chairIndex + 1}`,
+        outerGeometryName: `chair_t${tableIndex + 1}_c${chairIndex + 1}_frame`,
+        innerGeometryName: `chair_t${tableIndex + 1}_c${chairIndex + 1}_seat`,
+        outerMaterialName: "wood_light",
+        innerMaterialName: "fabric_blue",
+      }))
+    ).flat(),
+    
+    // Bar stools (6 stools)
+    ...Array.from({ length: 6 }, (_, index) => ({
+      type: "stool",
+      id: `BAR_STOOL${index + 1}`,
+      outerGeometryName: `barstool_${index + 1}`,
+      outerMaterialName: "metal_chrome",
+      // No inner geometry for these stools (single-part objects)
+    })),
+    
+    // Patio lounge chairs (4 chairs)
+    ...Array.from({ length: 4 }, (_, index) => ({
+      type: "lounge",
+      id: `PATIO_LOUNGE${index + 1}`,
+      outerGeometryName: `lounge_${index + 1}_frame`,
+      innerGeometryName: `lounge_${index + 1}_cushion`,
+      outerMaterialName: "rattan",
+      innerMaterialName: "fabric_white",
+    })),
+  ],
+  
+  // Define static (non-selectable) items
+  staticItems: [
+    { name: "floor_indoor", geometryName: "floor_indoor", materialName: "wood_floor" },
+    { name: "floor_patio", geometryName: "floor_patio", materialName: "stone_tiles" },
+    { name: "walls", geometryName: "walls", materialName: "paint_white" },
+    { name: "bar_counter", geometryName: "bar_counter", materialName: "marble_white" },
+    { name: "tables_indoor", geometryName: "tables_indoor", materialName: "wood_light" },
+    { name: "tables_patio", geometryName: "tables_patio", materialName: "glass" },
+    { name: "ceiling_fans", geometryName: "ceiling_fans", materialName: "wood_dark" },
+    { name: "beach_view", geometryName: "beach_view", materialName: "beach_scene" },
+    { name: "plants", geometryName: "plants", materialName: "tropical_plants" },
+    { name: "bar_shelves", geometryName: "bar_shelves", materialName: "wood_dark" },
+    { name: "lighting", geometryName: "lighting", materialName: "light_fixtures" },
+  ],
+  
+  // Custom colors and animation settings for this beach theme
+  selectionColor: new THREE.Color(0x4fc3f7), // Light blue for selection
+  occupiedColor: new THREE.Color(0xff5252), // Coral red for occupied
+  emissiveIntensity: 0.6,
+  animationSpeed: 1.8,
+  animationScale: 0.04,
+});
+```
+
+## 3. Add to Model Registry
+
+Update the model registry in `src/configs/ModelConfig.js`:
+
+```javascript
+// In src/configs/ModelConfig.js
+
+// Import the new configuration
+import { beachsideCafeConfig } from './BeachsideCafeConfig';
+
+// Update the model registry
+export const modelRegistry = {
+  kitchen: kitchenModelConfig,
+  fancyRestaurant: fancyRestaurantConfig,
+  modernCafe: modernCafeConfig,
+  beachsideCafe: beachsideCafeConfig,  // Add the new model
+  // Add more restaurant models here as they become available
+};
+```
+
+## 4. Create Custom Style (Optional)
+
+If you want to customize the scene appearance for this specific model:
+
+```javascript
+// In your component that uses the Scene
+<Scene 
+  modelConfig={modelConfig} 
+  selectedItems={selectedItems} 
+  occupiedItems={occupiedItems}
+  onItemClicked={handleItemClicked}
+  sceneStyle={{
+    width: "100%",
+    height: "500px",
+    borderRadius: "0",
+    background: "linear-gradient(180deg, #87CEEB 0%, #E0F7FA 100%)", // Beach sky gradient
+  }}
+/>
+```
+
+## 5. Add Custom Behavior for Lounge Chairs (Optional)
+
+If your new lounge chairs need special treatment, you can extend the SelectableItem component:
+
+```javascript
+// In src/components/Model/SelectableItem.js
+
+// Inside the SelectableItem component
+useFrame(() => {
+  if (selected && meshRef.current) {
+    const elapsed = clock.getElapsedTime();
+    
+    // Special animation for lounge chairs
+    if (itemConfig.type === 'lounge') {
+      // Gentle rocking motion for lounge chairs
+      const rock = 0.05 * Math.sin(elapsed * 1.5);
+      meshRef.current.rotation.x = rock;
+    } else {
+      // Regular scaling animation for other items
+      const scale = 1 + modelConfig.animationScale * Math.sin(elapsed * modelConfig.animationSpeed);
+      meshRef.current.scale.set(scale, scale, scale);
+    }
+  }
+});
+```
+
+## 6. Create a Section Selector Component (Optional)
+
+For a beach café with distinct sections (indoor, bar, patio), you might want a UI to filter by section:
+
+```jsx
+// src/components/SectionSelector.js
+import React from 'react';
+
+const SectionSelector = ({ currentSection, onSectionChange }) => {
+  const sections = [
+    { id: 'all', name: 'All Areas' },
+    { id: 'indoor', name: 'Indoor Dining' },
+    { id: 'bar', name: 'Bar Area' },
+    { id: 'patio', name: 'Beach Patio' },
+  ];
+  
+  return (
+    <div className="section-selector">
+      {sections.map(section => (
+        <button
+          key={section.id}
+          className={currentSection === section.id ? 'active' : ''}
+          onClick={() => onSectionChange(section.id)}
+        >
+          {section.name}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// Usage in RestaurantApp component
+const [currentSection, setCurrentSection] = useState('all');
+
+// Filter items based on section
+const filteredItems = useMemo(() => {
+  if (currentSection === 'all') return modelConfig.selectableItems;
+  return modelConfig.selectableItems.filter(item => {
+    if (currentSection === 'indoor' && item.id.startsWith('TABLE')) return true;
+    if (currentSection === 'bar' && item.id.startsWith('BAR_')) return true;
+    if (currentSection === 'patio' && item.id.startsWith('PATIO_')) return true;
+    return false;
+  });
+}, [currentSection, modelConfig]);
+
+// Then in your JSX
+<SectionSelector 
+  currentSection={currentSection}
+  onSectionChange={setCurrentSection}
+/>
+```
+
+## 7. Test the Implementation
+
+1. Place the `beachside_cafe.glb` file in the `public` directory
+2. Start your development server
+3. Navigate to your application
+4. Switch to the new model using:
+   - The UI selector if available
+   - The browser console: `window.changeRestaurantModel('beachsideCafe')`
+   - From React Native: Send a message to change the model
+
+## 8. Create Specialized Views (Advanced)
+
+For a beach café, you might want to add a "sunset mode" that changes lighting:
+
+```javascript
+// In your Scene component
+const [isEveningMode, setIsEveningMode] = useState(false);
+
+// In your Canvas
+<Canvas
+  style={canvasStyle}
+  flat
+  dpr={[1, 1.5]}
+  gl={{ antialias: false }}
+  camera={{ 
+    position: modelConfig.initialCameraPosition, 
+    fov: modelConfig.cameraFov 
+  }}
+>
+  {/* Dynamic lighting based on time of day */}
+  {isEveningMode ? (
+    <>
+      <ambientLight intensity={0.8 * Math.PI} color="#ff9e7d" />
+      <directionalLight 
+        position={[-10, 5, 5]} 
+        intensity={1.5} 
+        color="#ff7e50" 
+      />
+    </>
+  ) : (
+    <ambientLight intensity={1.5 * Math.PI} />
+  )}
+  
+  <Sky 
+    distance={450000} 
+    sunPosition={isEveningMode ? [0, 0.1, -1] : [0, 1, 0]} 
+    inclination={isEveningMode ? 0.1 : 0.6}
+    azimuth={isEveningMode ? 0.25 : 0.1}
+  />
+  
+  {/* Rest of your scene */}
+</Canvas>
+
+// Add a toggle button
+<button onClick={() => setIsEveningMode(!isEveningMode)}>
+  {isEveningMode ? 'Switch to Day View' : 'Switch to Sunset View'}
+</button>
+```
+
+This example shows how flexible the architecture is for adding new models with custom behavior while reusing all the core functionality.

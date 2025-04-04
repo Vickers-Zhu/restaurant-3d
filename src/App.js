@@ -1,20 +1,65 @@
 // src/App.js
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { Scene } from "./components/Scene";
 import { useReactNativeMessaging } from "./hooks/useReactNativeMessaging";
 import { useContentHeight } from "./hooks/useContentHeight";
+import { ModelProvider, useModel } from "./context/ModelProvider";
 
+/**
+ * Main application wrapper with ModelProvider context
+ */
 function App() {
-  const [selectedChairs, setSelectedChairs] = useState([]);
-  const [occupiedChairs, setOccupiedChairs] = useState([]);
+  return (
+    <ModelProvider initialModelKey="kitchen">
+      <RestaurantApp />
+    </ModelProvider>
+  );
+}
 
-  // Custom hook to handle messaging with React Native
-  const { notifyInteractionStart, notifyInteractionEnd } =
-    useReactNativeMessaging(setSelectedChairs, setOccupiedChairs);
+/**
+ * Inner component that uses the model context
+ */
+function RestaurantApp() {
+  // Get model state and methods from context
+  const {
+    modelConfig,
+    selectedItems,
+    occupiedItems,
+    setSelectedItems,
+    setOccupiedItems,
+    toggleItemSelection,
+    changeModel,
+  } = useModel();
 
-  // Custom hook to send content height to React Native
+  // Setup React Native communication
+  const { notifyInteractionStart, notifyInteractionEnd, postMessageToRN } =
+    useReactNativeMessaging(setSelectedItems, setOccupiedItems);
+
+  // Track content height for React Native WebView
   useContentHeight();
-  
+
+  // Handle item clicks in the 3D scene
+  const handleItemClicked = (itemId) => {
+    toggleItemSelection(itemId);
+  };
+
+  // Setup message listener for model switching from React Native
+  useEffect(() => {
+    // Allow changing the restaurant model from React Native
+    window.changeRestaurantModel = (modelKey) => {
+      changeModel(modelKey);
+      // Notify React Native that model was changed
+      postMessageToRN({
+        type: "modelChanged",
+        modelKey,
+        availableItems: modelConfig.selectableItems.map((item) => item.id),
+      });
+    };
+
+    return () => {
+      delete window.changeRestaurantModel;
+    };
+  }, [changeModel, modelConfig, postMessageToRN]);
 
   return (
     <div
@@ -24,7 +69,12 @@ function App() {
       onMouseDown={notifyInteractionStart}
       onMouseUp={notifyInteractionEnd}
     >
-      <Scene selectedChairs={selectedChairs} occupiedChairs={occupiedChairs} />
+      <Scene
+        modelConfig={modelConfig}
+        selectedItems={selectedItems}
+        occupiedItems={occupiedItems}
+        onItemClicked={handleItemClicked}
+      />
     </div>
   );
 }

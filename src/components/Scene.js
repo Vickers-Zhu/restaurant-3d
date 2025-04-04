@@ -1,14 +1,24 @@
-// src/web-app/src/components/Scene.js
-import React, { useState, useCallback } from "react";
+// src/components/Scene.js
+import React from "react";
 import { Canvas } from "@react-three/fiber";
 import { Sky, Bvh, OrbitControls } from "@react-three/drei";
 import { Selection } from "@react-three/postprocessing";
-// import { Model } from "./Model"; // Ensure this path is correct for your project structure
-import { Model } from "./Model/Model"; // Import Model component
-import { EffectComposer, Bloom } from "@react-three/postprocessing"; // Import Bloom for visual enhancements
 
-export function Scene({ selectedChairs, occupiedChairs }) {
-  const canvasStyle = {
+import { GenericModel } from "./Model/GenericModel";
+
+/**
+ * Scene component that renders the 3D environment
+ * Works with any restaurant model configuration
+ */
+export function Scene({
+  modelConfig,
+  selectedItems,
+  occupiedItems,
+  onItemClicked,
+  sceneStyle,
+}) {
+  // Default canvas style with sensible defaults
+  const defaultStyle = {
     width: "375px",
     height: "667px",
     margin: "0 auto",
@@ -18,23 +28,31 @@ export function Scene({ selectedChairs, occupiedChairs }) {
     border: "1px solid rgba(0, 0, 0, 0.1)",
   };
 
+  // Merge default style with any custom style properties
+  const canvasStyle = { ...defaultStyle, ...sceneStyle };
+
   return (
     <Canvas
       style={canvasStyle}
       flat
       dpr={[1, 1.5]}
       gl={{ antialias: false }}
-      camera={{ position: [0, 10, 0], fov: 40 }}
+      camera={{
+        position: modelConfig.initialCameraPosition,
+        fov: modelConfig.cameraFov,
+      }}
     >
       <ambientLight intensity={1.5 * Math.PI} />
       <Sky />
       <Bvh firstHitOnly>
         <Selection>
-          <Model
+          <GenericModel
             rotation={[0, 0, 0]}
             position={[-0.8, 0, 0]}
-            selectedChairs={selectedChairs}
-            occupiedChairs={occupiedChairs}
+            modelConfig={modelConfig}
+            selectedItems={selectedItems}
+            occupiedItems={occupiedItems}
+            onItemClicked={onItemClicked}
           />
         </Selection>
       </Bvh>
