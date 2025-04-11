@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 // src/components/Model/GenericModel.js
 import React, { useRef, useCallback } from "react";
 import { useGLTF } from "@react-three/drei";

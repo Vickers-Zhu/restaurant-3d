@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix. The content has been processed where comments have been removed, line numbers have been added.
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix. The content has been processed where comments have been removed, empty lines have been removed, line numbers have been added.
 
 ================================================================
 File Summary
@@ -41,6 +41,7 @@ Notes:
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Code comments have been removed from supported file types
+- Empty lines have been removed from all files
 - Line numbers have been added to the beginning of each line
 
 Additional Info:
@@ -54,7 +55,6 @@ src/
     Model/
       Effects.js
       GenericModel.js
-      Materials.js
       SelectableItem.js
     Scene.js
   configs/
@@ -88,282 +88,222 @@ File: src/components/Model/Effects.js
  5:   ToneMapping,
  6: } from "@react-three/postprocessing";
  7: import * as THREE from "three";
- 8: 
- 9: 
-10: 
-11: 
-12: const Effects = ({
-13:   selectedItems,
-14:   occupiedItems,
-15:   selectionColor,
-16:   occupiedColor,
-17: }) => {
-18:   const isSelected = (name) => selectedItems.includes(name);
-19:   const isOccupied = (name) => occupiedItems.includes(name);
-20: 
-21:   return (
-22:     <EffectComposer>
-23:       <Outline
-24:         selection={[...selectedItems, ...occupiedItems]}
-25:         edgeStrength={10}
-26:         visibleEdgeColor={(obj) => {
-27:           const name = obj.name;
-28:           if (isSelected(name)) {
-29:             return selectionColor;
-30:           } else if (isOccupied(name)) {
-31:             return occupiedColor;
-32:           }
-33:           return new THREE.Color(0x000000);
-34:         }}
-35:         hiddenEdgeColor={(obj) => {
-36:           const name = obj.name;
-37:           if (isSelected(name)) {
-38:             return selectionColor;
-39:           } else if (isOccupied(name)) {
-40:             return occupiedColor;
-41:           }
-42:           return new THREE.Color(0x000000);
-43:         }}
-44:       />
-45:       <ToneMapping />
-46:     </EffectComposer>
-47:   );
-48: };
-49: 
-50: export default Effects;
+ 8: const Effects = ({
+ 9:   selectedItems,
+10:   occupiedItems,
+11:   selectionColor,
+12:   occupiedColor,
+13: }) => {
+14:   const isSelected = (name) => selectedItems.includes(name);
+15:   const isOccupied = (name) => occupiedItems.includes(name);
+16:   return (
+17:     <EffectComposer>
+18:       <Outline
+19:         selection={[...selectedItems, ...occupiedItems]}
+20:         edgeStrength={10}
+21:         visibleEdgeColor={(obj) => {
+22:           const name = obj.name;
+23:           if (isSelected(name)) {
+24:             return selectionColor;
+25:           } else if (isOccupied(name)) {
+26:             return occupiedColor;
+27:           }
+28:           return new THREE.Color(0x000000);
+29:         }}
+30:         hiddenEdgeColor={(obj) => {
+31:           const name = obj.name;
+32:           if (isSelected(name)) {
+33:             return selectionColor;
+34:           } else if (isOccupied(name)) {
+35:             return occupiedColor;
+36:           }
+37:           return new THREE.Color(0x000000);
+38:         }}
+39:       />
+40:       <ToneMapping />
+41:     </EffectComposer>
+42:   );
+43: };
+44: export default Effects;
 
 ================
 File: src/components/Model/GenericModel.js
 ================
-  1: import React, { useRef, useCallback } from "react";
-  2: import { useGLTF } from "@react-three/drei";
-  3: import { Clock } from "three";
-  4: import SelectableItem from "./SelectableItem";
-  5: import Effects from "./Effects";
-  6: import useDebouncedHover from "../../hooks/useDebouncedHover";
-  7: 
-  8: 
-  9: 
- 10: 
- 11: export function GenericModel({
- 12:   modelConfig,
- 13:   selectedItems,
- 14:   occupiedItems,
- 15:   onItemClicked,
- 16:   ...props
- 17: }) {
- 18: 
- 19:   const { nodes, materials } = useGLTF(modelConfig.modelPath);
- 20:   const groupRef = useRef();
- 21:   const clock = useRef(new Clock());
- 22: 
- 23:   const { hovered, handlePointerOver, handlePointerOut } =
- 24:     useDebouncedHover(30);
- 25: 
- 26: 
- 27:   const handleClick = useCallback(
- 28:     (itemId) => (e) => {
- 29:       e.stopPropagation();
- 30: 
- 31: 
- 32:       if (onItemClicked) {
- 33:         onItemClicked(itemId);
- 34:       }
- 35: 
- 36: 
- 37:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
- 38:         window.ReactNativeWebView.postMessage(
- 39:           JSON.stringify({ type: "itemClicked", id: itemId })
- 40:         );
- 41:       }
- 42:     },
- 43:     [onItemClicked]
- 44:   );
- 45: 
- 46:   return (
- 47:     <group ref={groupRef} {...props}>
- 48:       {}
- 49:       <Effects
- 50:         selectedItems={selectedItems}
- 51:         occupiedItems={occupiedItems}
- 52:         selectionColor={modelConfig.selectionColor}
- 53:         occupiedColor={modelConfig.occupiedColor}
- 54:       />
- 55: 
- 56:       {}
- 57:       {modelConfig.staticItems.map((item) => (
- 58:         <mesh
- 59:           key={item.name}
- 60:           geometry={nodes[item.geometryName].geometry}
- 61:           material={materials[item.materialName]}
- 62:         />
- 63:       ))}
- 64: 
- 65:       {}
- 66:       {modelConfig.selectableItems.map((item) => {
- 67:         const selected = selectedItems.includes(item.id);
- 68:         const occupied = occupiedItems.includes(item.id);
- 69: 
- 70:         return (
- 71:           <SelectableItem
- 72:             key={item.id}
- 73:             itemConfig={item}
- 74:             geometryOuter={nodes[item.outerGeometryName].geometry}
- 75:             geometryInner={
- 76:               item.innerGeometryName
- 77:                 ? nodes[item.innerGeometryName].geometry
- 78:                 : null
- 79:             }
- 80:             materialOuter={materials[item.outerMaterialName]}
- 81:             materialInner={
- 82:               item.innerMaterialName ? materials[item.innerMaterialName] : null
- 83:             }
- 84:             modelConfig={modelConfig}
- 85:             selected={selected}
- 86:             occupied={occupied}
- 87:             onPointerOver={() => handlePointerOver(item.id, occupiedItems)}
- 88:             onPointerOut={handlePointerOut}
- 89:             onClick={handleClick(item.id)}
- 90:             clock={clock.current}
- 91:           />
- 92:         );
- 93:       })}
- 94:     </group>
- 95:   );
- 96: }
- 97: 
- 98: 
- 99: export const preloadModel = (modelConfig) => {
-100:   useGLTF.preload(modelConfig.modelPath);
-101: };
-
-================
-File: src/components/Model/Materials.js
-================
- 1: import * as THREE from "three";
- 2: 
- 3: export const emissiveColorSelected = new THREE.Color(0x00ff00);
- 4: export const emissiveColorOccupied = new THREE.Color(0xff0000);
- 5: 
- 6: 
- 7: 
- 8: 
- 9: 
-10: 
-11: 
-12: 
-13: export const createEmissiveMaterial = (baseMaterial, emissiveColor) => {
-14:   return new THREE.MeshStandardMaterial({
-15:     ...baseMaterial,
-16:     emissive: emissiveColor,
-17:     emissiveIntensity: 0.5,
-18:   });
-19: };
+ 1: import React, { useRef, useCallback } from "react";
+ 2: import { useGLTF } from "@react-three/drei";
+ 3: import { Clock } from "three";
+ 4: import SelectableItem from "./SelectableItem";
+ 5: import Effects from "./Effects";
+ 6: import useDebouncedHover from "../../hooks/useDebouncedHover";
+ 7: export function GenericModel({
+ 8:   modelConfig,
+ 9:   selectedItems,
+10:   occupiedItems,
+11:   onItemClicked,
+12:   ...props
+13: }) {
+14:   const { nodes, materials } = useGLTF(modelConfig.modelPath);
+15:   const groupRef = useRef();
+16:   const clock = useRef(new Clock());
+17:   const { hovered, handlePointerOver, handlePointerOut } =
+18:     useDebouncedHover(30);
+19:   const handleClick = useCallback(
+20:     (itemId) => (e) => {
+21:       e.stopPropagation();
+22:       if (onItemClicked) {
+23:         onItemClicked(itemId);
+24:       }
+25:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+26:         window.ReactNativeWebView.postMessage(
+27:           JSON.stringify({ type: "itemClicked", id: itemId })
+28:         );
+29:       }
+30:     },
+31:     [onItemClicked]
+32:   );
+33:   return (
+34:     <group ref={groupRef} {...props}>
+35:       {}
+36:       <Effects
+37:         selectedItems={selectedItems}
+38:         occupiedItems={occupiedItems}
+39:         selectionColor={modelConfig.selectionColor}
+40:         occupiedColor={modelConfig.occupiedColor}
+41:       />
+42:       {}
+43:       {modelConfig.staticItems.map((item) => (
+44:         <mesh
+45:           key={item.name}
+46:           geometry={nodes[item.geometryName].geometry}
+47:           material={materials[item.materialName]}
+48:         />
+49:       ))}
+50:       {}
+51:       {modelConfig.selectableItems.map((item) => {
+52:         const selected = selectedItems.includes(item.id);
+53:         const occupied = occupiedItems.includes(item.id);
+54:         return (
+55:           <SelectableItem
+56:             key={item.id}
+57:             itemConfig={item}
+58:             geometryOuter={nodes[item.outerGeometryName].geometry}
+59:             geometryInner={
+60:               item.innerGeometryName
+61:                 ? nodes[item.innerGeometryName].geometry
+62:                 : null
+63:             }
+64:             materialOuter={materials[item.outerMaterialName]}
+65:             materialInner={
+66:               item.innerMaterialName ? materials[item.innerMaterialName] : null
+67:             }
+68:             modelConfig={modelConfig}
+69:             selected={selected}
+70:             occupied={occupied}
+71:             onPointerOver={() => handlePointerOver(item.id, occupiedItems)}
+72:             onPointerOut={handlePointerOut}
+73:             onClick={handleClick(item.id)}
+74:             clock={clock.current}
+75:           />
+76:         );
+77:       })}
+78:     </group>
+79:   );
+80: }
+81: export const preloadModel = (modelConfig) => {
+82:   useGLTF.preload(modelConfig.modelPath);
+83: };
 
 ================
 File: src/components/Model/SelectableItem.js
 ================
-  1: import React, { useRef, useEffect } from "react";
-  2: import { useFrame } from "@react-three/fiber";
-  3: 
-  4: 
-  5: 
-  6: 
-  7: 
-  8: const SelectableItem = ({
-  9:   itemConfig,
- 10:   geometryOuter,
- 11:   geometryInner,
- 12:   materialOuter,
- 13:   materialInner,
- 14:   modelConfig,
- 15:   selected,
- 16:   occupied,
- 17:   onPointerOver,
- 18:   onPointerOut,
- 19:   onClick,
- 20:   clock,
- 21: }) => {
- 22:   const meshRef = useRef();
- 23:   const innerMeshRef = useRef();
- 24:   const { id, type } = itemConfig;
- 25: 
- 26: 
- 27:   const emissiveMaterialOuterSelected = modelConfig.createEmissiveMaterial(
- 28:     materialOuter,
- 29:     modelConfig.selectionColor
- 30:   );
- 31:   const emissiveMaterialOuterOccupied = modelConfig.createEmissiveMaterial(
- 32:     materialOuter,
- 33:     modelConfig.occupiedColor
- 34:   );
- 35:   const emissiveMaterialInnerSelected = modelConfig.createEmissiveMaterial(
- 36:     materialInner,
- 37:     modelConfig.selectionColor
- 38:   );
- 39:   const emissiveMaterialInnerOccupied = modelConfig.createEmissiveMaterial(
- 40:     materialInner,
- 41:     modelConfig.occupiedColor
- 42:   );
- 43: 
- 44: 
- 45:   useEffect(() => {
- 46:     if (selected) {
- 47:       meshRef.current.material = emissiveMaterialOuterSelected;
- 48:       if (innerMeshRef.current) {
- 49:         innerMeshRef.current.material = emissiveMaterialInnerSelected;
- 50:       }
- 51:     } else if (occupied) {
- 52:       meshRef.current.material = emissiveMaterialOuterOccupied;
- 53:       if (innerMeshRef.current) {
- 54:         innerMeshRef.current.material = emissiveMaterialInnerOccupied;
- 55:       }
- 56:     } else {
- 57:       meshRef.current.material = materialOuter;
- 58:       if (innerMeshRef.current) {
- 59:         innerMeshRef.current.material = materialInner;
- 60:       }
- 61:     }
- 62:   }, [
- 63:     selected,
- 64:     occupied,
- 65:     emissiveMaterialOuterSelected,
- 66:     emissiveMaterialOuterOccupied,
- 67:     emissiveMaterialInnerSelected,
- 68:     emissiveMaterialInnerOccupied,
- 69:     materialOuter,
- 70:     materialInner,
- 71:   ]);
- 72: 
- 73: 
- 74:   useFrame(() => {
- 75:     if (selected && meshRef.current) {
- 76:       const elapsed = clock.getElapsedTime();
- 77:       const scale =
- 78:         1 +
- 79:         modelConfig.animationScale *
- 80:           Math.sin(elapsed * modelConfig.animationSpeed);
- 81:       meshRef.current.scale.set(scale, scale, scale);
- 82:     }
- 83:   });
- 84: 
- 85:   return (
- 86:     <mesh
- 87:       ref={meshRef}
- 88:       geometry={geometryOuter}
- 89:       onPointerOver={onPointerOver}
- 90:       onPointerOut={onPointerOut}
- 91:       onClick={onClick}
- 92:       name={id}
- 93:     >
- 94:       {geometryInner && (
- 95:         <mesh ref={innerMeshRef} geometry={geometryInner} name={id} />
- 96:       )}
- 97:     </mesh>
- 98:   );
- 99: };
-100: 
-101: export default SelectableItem;
+ 1: import React, { useRef, useEffect } from "react";
+ 2: import { useFrame } from "@react-three/fiber";
+ 3: const SelectableItem = ({
+ 4:   itemConfig,
+ 5:   geometryOuter,
+ 6:   geometryInner,
+ 7:   materialOuter,
+ 8:   materialInner,
+ 9:   modelConfig,
+10:   selected,
+11:   occupied,
+12:   onPointerOver,
+13:   onPointerOut,
+14:   onClick,
+15:   clock,
+16: }) => {
+17:   const meshRef = useRef();
+18:   const innerMeshRef = useRef();
+19:   const { id, type } = itemConfig;
+20:   const emissiveMaterialOuterSelected = modelConfig.createEmissiveMaterial(
+21:     materialOuter,
+22:     modelConfig.selectionColor
+23:   );
+24:   const emissiveMaterialOuterOccupied = modelConfig.createEmissiveMaterial(
+25:     materialOuter,
+26:     modelConfig.occupiedColor
+27:   );
+28:   const emissiveMaterialInnerSelected = modelConfig.createEmissiveMaterial(
+29:     materialInner,
+30:     modelConfig.selectionColor
+31:   );
+32:   const emissiveMaterialInnerOccupied = modelConfig.createEmissiveMaterial(
+33:     materialInner,
+34:     modelConfig.occupiedColor
+35:   );
+36:   useEffect(() => {
+37:     if (selected) {
+38:       meshRef.current.material = emissiveMaterialOuterSelected;
+39:       if (innerMeshRef.current) {
+40:         innerMeshRef.current.material = emissiveMaterialInnerSelected;
+41:       }
+42:     } else if (occupied) {
+43:       meshRef.current.material = emissiveMaterialOuterOccupied;
+44:       if (innerMeshRef.current) {
+45:         innerMeshRef.current.material = emissiveMaterialInnerOccupied;
+46:       }
+47:     } else {
+48:       meshRef.current.material = materialOuter;
+49:       if (innerMeshRef.current) {
+50:         innerMeshRef.current.material = materialInner;
+51:       }
+52:     }
+53:   }, [
+54:     selected,
+55:     occupied,
+56:     emissiveMaterialOuterSelected,
+57:     emissiveMaterialOuterOccupied,
+58:     emissiveMaterialInnerSelected,
+59:     emissiveMaterialInnerOccupied,
+60:     materialOuter,
+61:     materialInner,
+62:   ]);
+63:   useFrame(() => {
+64:     if (selected && meshRef.current) {
+65:       const elapsed = clock.getElapsedTime();
+66:       const scale =
+67:         1 +
+68:         modelConfig.animationScale *
+69:           Math.sin(elapsed * modelConfig.animationSpeed);
+70:       meshRef.current.scale.set(scale, scale, scale);
+71:     }
+72:   });
+73:   return (
+74:     <mesh
+75:       ref={meshRef}
+76:       geometry={geometryOuter}
+77:       onPointerOver={onPointerOver}
+78:       onPointerOut={onPointerOut}
+79:       onClick={onClick}
+80:       name={id}
+81:     >
+82:       {geometryInner && (
+83:         <mesh ref={innerMeshRef} geometry={geometryInner} name={id} />
+84:       )}
+85:     </mesh>
+86:   );
+87: };
+88: export default SelectableItem;
 
 ================
 File: src/components/Scene.js
@@ -372,224 +312,204 @@ File: src/components/Scene.js
  2: import { Canvas } from "@react-three/fiber";
  3: import { Sky, Bvh, OrbitControls } from "@react-three/drei";
  4: import { Selection } from "@react-three/postprocessing";
- 5: 
- 6: import { GenericModel } from "./Model/GenericModel";
- 7: 
- 8: 
- 9: 
-10: 
-11: 
-12: export function Scene({
-13:   modelConfig,
-14:   selectedItems,
-15:   occupiedItems,
-16:   onItemClicked,
-17:   sceneStyle,
-18: }) {
-19: 
-20:   const defaultStyle = {
-21:     width: "375px",
-22:     height: "667px",
-23:     margin: "0 auto",
-24:     borderRadius: "15px",
-25:     boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2), 0 5px 15px rgba(0, 0, 0, 0.15)",
-26:     background: "linear-gradient(135deg, #f5f5f5, #eaeaea)",
-27:     border: "1px solid rgba(0, 0, 0, 0.1)",
-28:   };
-29: 
-30: 
-31:   const canvasStyle = { ...defaultStyle, ...sceneStyle };
-32: 
-33:   return (
-34:     <Canvas
-35:       style={canvasStyle}
-36:       flat
-37:       dpr={[1, 1.5]}
-38:       gl={{ antialias: false }}
-39:       camera={{
-40:         position: modelConfig.initialCameraPosition,
-41:         fov: modelConfig.cameraFov,
-42:       }}
-43:     >
-44:       <ambientLight intensity={1.5 * Math.PI} />
-45:       <Sky />
-46:       <Bvh firstHitOnly>
-47:         <Selection>
-48:           <GenericModel
-49:             rotation={[0, 0, 0]}
-50:             position={[-0.8, 0, 0]}
-51:             modelConfig={modelConfig}
-52:             selectedItems={selectedItems}
-53:             occupiedItems={occupiedItems}
-54:             onItemClicked={onItemClicked}
-55:           />
-56:         </Selection>
-57:       </Bvh>
-58:       <OrbitControls
-59:         enableZoom={true}
-60:         enablePan={true}
-61:         enableRotate={true}
-62:         panSpeed={1}
-63:         zoomSpeed={1.5}
-64:         rotateSpeed={1.2}
-65:         screenSpacePanning={true}
-66:         touchPan={1}
-67:         touchRotate={2}
-68:         touchZoom={2}
-69:       />
-70:     </Canvas>
-71:   );
-72: }
-73: 
-74: export default Scene;
+ 5: import { GenericModel } from "./Model/GenericModel";
+ 6: export function Scene({
+ 7:   modelConfig,
+ 8:   selectedItems,
+ 9:   occupiedItems,
+10:   onItemClicked,
+11:   sceneStyle,
+12: }) {
+13:   const defaultStyle = {
+14:     width: "375px",
+15:     height: "667px",
+16:     margin: "0 auto",
+17:     borderRadius: "15px",
+18:     boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2), 0 5px 15px rgba(0, 0, 0, 0.15)",
+19:     background: "linear-gradient(135deg, #f5f5f5, #eaeaea)",
+20:     border: "1px solid rgba(0, 0, 0, 0.1)",
+21:   };
+22:   const canvasStyle = { ...defaultStyle, ...sceneStyle };
+23:   return (
+24:     <Canvas
+25:       style={canvasStyle}
+26:       flat
+27:       dpr={[1, 1.5]}
+28:       gl={{ antialias: false }}
+29:       camera={{
+30:         position: modelConfig.initialCameraPosition,
+31:         fov: modelConfig.cameraFov,
+32:       }}
+33:     >
+34:       <ambientLight intensity={1.5 * Math.PI} />
+35:       <Sky />
+36:       <Bvh firstHitOnly>
+37:         <Selection>
+38:           <GenericModel
+39:             rotation={[0, 0, 0]}
+40:             position={[-0.8, 0, 0]}
+41:             modelConfig={modelConfig}
+42:             selectedItems={selectedItems}
+43:             occupiedItems={occupiedItems}
+44:             onItemClicked={onItemClicked}
+45:           />
+46:         </Selection>
+47:       </Bvh>
+48:       <OrbitControls
+49:         enableZoom={true}
+50:         enablePan={true}
+51:         enableRotate={true}
+52:         panSpeed={1}
+53:         zoomSpeed={1.5}
+54:         rotateSpeed={1.2}
+55:         screenSpacePanning={true}
+56:         touchPan={1}
+57:         touchRotate={2}
+58:         touchZoom={2}
+59:       />
+60:     </Canvas>
+61:   );
+62: }
+63: export default Scene;
 
 ================
 File: src/configs/ModelConfig.js
 ================
   1: import * as THREE from "three";
-  2: 
-  3: 
-  4: 
-  5: 
-  6: 
-  7: export class RestaurantModelConfig {
-  8:   constructor({
-  9:     modelPath,
- 10:     initialCameraPosition = [0, 10, 0],
- 11:     cameraFov = 40,
- 12:     selectableItems = [],
- 13:     staticItems = [],
- 14:     selectionColor = new THREE.Color(0x00ff00),
- 15:     occupiedColor = new THREE.Color(0xff0000),
- 16:     emissiveIntensity = 0.5,
- 17:     animationSpeed = 2,
- 18:     animationScale = 0.05
- 19:   }) {
- 20:     this.modelPath = modelPath;
- 21:     this.initialCameraPosition = initialCameraPosition;
- 22:     this.cameraFov = cameraFov;
- 23:     this.selectableItems = selectableItems;
- 24:     this.staticItems = staticItems;
- 25:     this.selectionColor = selectionColor;
- 26:     this.occupiedColor = occupiedColor;
- 27:     this.emissiveIntensity = emissiveIntensity;
- 28:     this.animationSpeed = animationSpeed;
- 29:     this.animationScale = animationScale;
- 30:   }
- 31: 
- 32: 
- 33:   createEmissiveMaterial(baseMaterial, emissiveColor) {
- 34:     return new THREE.MeshStandardMaterial({
- 35:       ...baseMaterial,
- 36:       emissive: emissiveColor,
- 37:       emissiveIntensity: this.emissiveIntensity,
- 38:     });
- 39:   }
- 40: }
- 41: 
- 42: 
- 43: 
- 44: 
- 45: export const kitchenModelConfig = new RestaurantModelConfig({
- 46:   modelPath: "/kitchen.glb",
- 47:   selectableItems: [
- 48:     {
- 49:       type: "chair",
- 50:       id: "CHAIR1",
- 51:       outerGeometryName: "chairs001_1",
- 52:       innerGeometryName: "chairs001_2",
- 53:       outerMaterialName: "walls",
- 54:       innerMaterialName: "plastic",
- 55:     },
- 56:     {
- 57:       type: "chair",
- 58:       id: "CHAIR2",
- 59:       outerGeometryName: "chairs002_1",
- 60:       innerGeometryName: "chairs002_2",
- 61:       outerMaterialName: "walls",
- 62:       innerMaterialName: "plastic",
- 63:     },
- 64:     {
- 65:       type: "chair",
- 66:       id: "CHAIR3",
- 67:       outerGeometryName: "chairs003_1",
- 68:       innerGeometryName: "chairs003_2",
- 69:       outerMaterialName: "walls",
- 70:       innerMaterialName: "plastic",
- 71:     },
- 72:     {
- 73:       type: "chair",
- 74:       id: "CHAIR4",
- 75:       outerGeometryName: "chairs004_1",
- 76:       innerGeometryName: "chairs004_2",
- 77:       outerMaterialName: "walls",
- 78:       innerMaterialName: "plastic",
- 79:     },
- 80:     {
- 81:       type: "chair",
- 82:       id: "CHAIR5",
- 83:       outerGeometryName: "chairs005_1",
- 84:       innerGeometryName: "chairs005_2",
- 85:       outerMaterialName: "walls",
- 86:       innerMaterialName: "plastic",
- 87:     },
- 88:     {
- 89:       type: "chair",
- 90:       id: "CHAIR6",
- 91:       outerGeometryName: "chairs006_1",
- 92:       innerGeometryName: "chairs006_2",
- 93:       outerMaterialName: "walls",
- 94:       innerMaterialName: "plastic",
- 95:     },
- 96:   ],
- 97:   staticItems: [
- 98:     { name: "vase1", geometryName: "vase1", materialName: "gray" },
- 99:     { name: "bottle", geometryName: "bottle", materialName: "gray" },
-100:     { name: "walls", geometryName: "walls_1", materialName: "floor" },
-101:     { name: "plant_leaves", geometryName: "plant_1", materialName: "potted_plant_01_leaves" },
-102:     { name: "plant_pot", geometryName: "plant_2", materialName: "potted_plant_01_pot" },
-103:     { name: "cuttingboard", geometryName: "cuttingboard", materialName: "walls" },
-104:     { name: "bowl", geometryName: "bowl", materialName: "walls" },
-105:     { name: "carpet", geometryName: "carpet", materialName: "carpet" },
-106:     { name: "table", geometryName: "table", materialName: "walls" },
-107:     { name: "vase", geometryName: "vase", materialName: "gray" },
-108:     { name: "kitchen", geometryName: "kitchen", materialName: "walls" },
-109:     { name: "sink", geometryName: "sink", materialName: "chrome" },
-110:   ],
-111: });
-112: 
-113: 
-114: 
-115: 
-116: 
-117: export const modernRestaurantConfig = new RestaurantModelConfig({
-118:   modelPath: "/modern-restaurant.glb",
-119:   initialCameraPosition: [0, 8, 5],
-120:   cameraFov: 45,
-121:   selectableItems: [
-122:     {
-123:       type: "chair",
-124:       id: "TABLE1_CHAIR1",
-125:       outerGeometryName: "chair_1_outer",
-126:       innerGeometryName: "chair_1_inner",
-127:       outerMaterialName: "chair_material",
-128:       innerMaterialName: "cushion_material",
-129:     },
-130: 
-131:   ],
-132:   staticItems: [
-133: 
-134:   ],
-135:   selectionColor: new THREE.Color(0x2196f3),
-136:   occupiedColor: new THREE.Color(0xff5252),
-137: });
-138: 
-139: 
-140: export const modelRegistry = {
-141:   kitchen: kitchenModelConfig,
-142:   modernRestaurant: modernRestaurantConfig,
-143: 
-144: };
+  2: export class RestaurantModelConfig {
+  3:   constructor({
+  4:     modelPath,
+  5:     initialCameraPosition = [0, 10, 0],
+  6:     cameraFov = 40,
+  7:     selectableItems = [],
+  8:     staticItems = [],
+  9:     selectionColor = new THREE.Color(0x00ff00),
+ 10:     occupiedColor = new THREE.Color(0xff0000),
+ 11:     emissiveIntensity = 0.5,
+ 12:     animationSpeed = 2,
+ 13:     animationScale = 0.05,
+ 14:   }) {
+ 15:     this.modelPath = modelPath;
+ 16:     this.initialCameraPosition = initialCameraPosition;
+ 17:     this.cameraFov = cameraFov;
+ 18:     this.selectableItems = selectableItems;
+ 19:     this.staticItems = staticItems;
+ 20:     this.selectionColor = selectionColor;
+ 21:     this.occupiedColor = occupiedColor;
+ 22:     this.emissiveIntensity = emissiveIntensity;
+ 23:     this.animationSpeed = animationSpeed;
+ 24:     this.animationScale = animationScale;
+ 25:   }
+ 26:   createEmissiveMaterial(baseMaterial, emissiveColor) {
+ 27:     return new THREE.MeshStandardMaterial({
+ 28:       ...baseMaterial,
+ 29:       emissive: emissiveColor,
+ 30:       emissiveIntensity: this.emissiveIntensity,
+ 31:     });
+ 32:   }
+ 33: }
+ 34: export const kitchenModelConfig = new RestaurantModelConfig({
+ 35:   modelPath: "/kitchen.glb",
+ 36:   selectableItems: [
+ 37:     {
+ 38:       type: "chair",
+ 39:       id: "CHAIR1",
+ 40:       outerGeometryName: "chairs001_1",
+ 41:       innerGeometryName: "chairs001_2",
+ 42:       outerMaterialName: "walls",
+ 43:       innerMaterialName: "plastic",
+ 44:     },
+ 45:     {
+ 46:       type: "chair",
+ 47:       id: "CHAIR2",
+ 48:       outerGeometryName: "chairs002_1",
+ 49:       innerGeometryName: "chairs002_2",
+ 50:       outerMaterialName: "walls",
+ 51:       innerMaterialName: "plastic",
+ 52:     },
+ 53:     {
+ 54:       type: "chair",
+ 55:       id: "CHAIR3",
+ 56:       outerGeometryName: "chairs003_1",
+ 57:       innerGeometryName: "chairs003_2",
+ 58:       outerMaterialName: "walls",
+ 59:       innerMaterialName: "plastic",
+ 60:     },
+ 61:     {
+ 62:       type: "chair",
+ 63:       id: "CHAIR4",
+ 64:       outerGeometryName: "chairs004_1",
+ 65:       innerGeometryName: "chairs004_2",
+ 66:       outerMaterialName: "walls",
+ 67:       innerMaterialName: "plastic",
+ 68:     },
+ 69:     {
+ 70:       type: "chair",
+ 71:       id: "CHAIR5",
+ 72:       outerGeometryName: "chairs005_1",
+ 73:       innerGeometryName: "chairs005_2",
+ 74:       outerMaterialName: "walls",
+ 75:       innerMaterialName: "plastic",
+ 76:     },
+ 77:     {
+ 78:       type: "chair",
+ 79:       id: "CHAIR6",
+ 80:       outerGeometryName: "chairs006_1",
+ 81:       innerGeometryName: "chairs006_2",
+ 82:       outerMaterialName: "walls",
+ 83:       innerMaterialName: "plastic",
+ 84:     },
+ 85:   ],
+ 86:   staticItems: [
+ 87:     { name: "vase1", geometryName: "vase1", materialName: "gray" },
+ 88:     { name: "bottle", geometryName: "bottle", materialName: "gray" },
+ 89:     { name: "walls", geometryName: "walls_1", materialName: "floor" },
+ 90:     {
+ 91:       name: "plant_leaves",
+ 92:       geometryName: "plant_1",
+ 93:       materialName: "potted_plant_01_leaves",
+ 94:     },
+ 95:     {
+ 96:       name: "plant_pot",
+ 97:       geometryName: "plant_2",
+ 98:       materialName: "potted_plant_01_pot",
+ 99:     },
+100:     {
+101:       name: "cuttingboard",
+102:       geometryName: "cuttingboard",
+103:       materialName: "walls",
+104:     },
+105:     { name: "bowl", geometryName: "bowl", materialName: "walls" },
+106:     { name: "carpet", geometryName: "carpet", materialName: "carpet" },
+107:     { name: "table", geometryName: "table", materialName: "walls" },
+108:     { name: "vase", geometryName: "vase", materialName: "gray" },
+109:     { name: "kitchen", geometryName: "kitchen", materialName: "walls" },
+110:     { name: "sink", geometryName: "sink", materialName: "chrome" },
+111:   ],
+112: });
+113: export const modernRestaurantConfig = new RestaurantModelConfig({
+114:   modelPath: "/modern-restaurant.glb",
+115:   initialCameraPosition: [0, 8, 5],
+116:   cameraFov: 45,
+117:   selectableItems: [
+118:     {
+119:       type: "chair",
+120:       id: "TABLE1_CHAIR1",
+121:       outerGeometryName: "chair_1_outer",
+122:       innerGeometryName: "chair_1_inner",
+123:       outerMaterialName: "chair_material",
+124:       innerMaterialName: "cushion_material",
+125:     },
+126:   ],
+127:   staticItems: [
+128:   ],
+129:   selectionColor: new THREE.Color(0x2196f3),
+130:   occupiedColor: new THREE.Color(0xff5252),
+131: });
+132: export const modelRegistry = {
+133:   kitchen: kitchenModelConfig,
+134:   modernRestaurant: modernRestaurantConfig,
+135: };
 
 ================
 File: src/context/ModelProvider.js
@@ -603,280 +523,202 @@ File: src/context/ModelProvider.js
   7: } from "react";
   8: import { useGLTF } from "@react-three/drei";
   9: import { modelRegistry } from "../configs/ModelConfig";
- 10: 
- 11: 
- 12: const ModelContext = createContext(null);
- 13: 
- 14: 
- 15: 
- 16: 
- 17: export const ModelProvider = ({ children, initialModelKey = "kitchen" }) => {
- 18: 
- 19:   const [currentModelKey, setCurrentModelKey] = useState(initialModelKey);
- 20:   const [modelConfig, setModelConfig] = useState(
- 21:     modelRegistry[initialModelKey]
- 22:   );
- 23: 
- 24: 
- 25:   const [selectedItems, setSelectedItems] = useState([]);
- 26:   const [occupiedItems, setOccupiedItems] = useState(["chairs001"]);
- 27: 
- 28: 
- 29:   const [isLoading, setIsLoading] = useState(true);
- 30: 
- 31: 
- 32:   useGLTF.preload(modelConfig?.modelPath);
- 33: 
- 34: 
- 35:   useEffect(() => {
- 36:     const config = modelRegistry[currentModelKey];
- 37:     if (config) {
- 38:       setModelConfig(config);
- 39:       setIsLoading(true);
- 40: 
- 41: 
- 42:       useGLTF.preload(config.modelPath, () => {
- 43:         setIsLoading(false);
- 44:       });
- 45: 
- 46: 
- 47:       setSelectedItems([]);
- 48:     } else {
- 49:       console.error(`Model configuration for "${currentModelKey}" not found`);
- 50:     }
- 51:   }, [currentModelKey]);
- 52: 
- 53: 
- 54:   const changeModel = useCallback((modelKey) => {
- 55:     if (modelRegistry[modelKey]) {
- 56:       setCurrentModelKey(modelKey);
- 57:     } else {
- 58:       console.error(`Model "${modelKey}" not found in registry`);
- 59:     }
- 60:   }, []);
- 61: 
- 62: 
- 63:   const toggleItemSelection = useCallback(
- 64:     (itemId) => {
- 65:       if (occupiedItems.includes(itemId)) {
- 66:         return;
- 67:       }
- 68: 
- 69:       setSelectedItems((prev) => {
- 70:         if (prev.includes(itemId)) {
- 71:           return prev.filter((id) => id !== itemId);
- 72:         } else {
- 73:           return [...prev, itemId];
- 74:         }
- 75:       });
- 76:     },
- 77:     [occupiedItems]
- 78:   );
- 79: 
- 80: 
- 81:   const setItemsAsOccupied = useCallback((itemIds) => {
- 82:     if (!Array.isArray(itemIds)) {
- 83:       itemIds = [itemIds];
- 84:     }
- 85: 
- 86: 
- 87:     setSelectedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
- 88: 
- 89: 
- 90:     setOccupiedItems((prev) => {
- 91:       const newOccupied = [...prev];
- 92:       itemIds.forEach((id) => {
- 93:         if (!newOccupied.includes(id)) {
- 94:           newOccupied.push(id);
- 95:         }
- 96:       });
- 97:       return newOccupied;
- 98:     });
- 99:   }, []);
-100: 
-101: 
-102:   const clearOccupancy = useCallback((itemIds) => {
-103:     if (!Array.isArray(itemIds)) {
-104:       itemIds = [itemIds];
-105:     }
-106: 
-107:     setOccupiedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
-108:   }, []);
-109: 
-110: 
-111:   const availableItems =
-112:     modelConfig?.selectableItems.map((item) => item.id) || [];
-113: 
-114: 
-115:   const contextValue = {
-116:     currentModelKey,
-117:     modelConfig,
-118:     isLoading,
-119:     selectedItems,
-120:     occupiedItems,
-121:     availableItems,
-122:     changeModel,
-123:     toggleItemSelection,
-124:     setSelectedItems,
-125:     setOccupiedItems,
-126:     setItemsAsOccupied,
-127:     clearOccupancy,
-128:   };
-129: 
-130:   return (
-131:     <ModelContext.Provider value={contextValue}>
-132:       {children}
-133:     </ModelContext.Provider>
-134:   );
-135: };
-136: 
-137: 
-138: 
-139: 
-140: export const useModel = () => {
-141:   const context = useContext(ModelContext);
-142:   if (!context) {
-143:     throw new Error("useModel must be used within a ModelProvider");
-144:   }
-145:   return context;
-146: };
+ 10: const ModelContext = createContext(null);
+ 11: export const ModelProvider = ({ children, initialModelKey = "kitchen" }) => {
+ 12:   const [currentModelKey, setCurrentModelKey] = useState(initialModelKey);
+ 13:   const [modelConfig, setModelConfig] = useState(
+ 14:     modelRegistry[initialModelKey]
+ 15:   );
+ 16:   const [selectedItems, setSelectedItems] = useState([]);
+ 17:   const [occupiedItems, setOccupiedItems] = useState(["CHAIR1", "CHAIR3"]);
+ 18:   const [isLoading, setIsLoading] = useState(true);
+ 19:   useGLTF.preload(modelConfig?.modelPath);
+ 20:   useEffect(() => {
+ 21:     const config = modelRegistry[currentModelKey];
+ 22:     if (config) {
+ 23:       setModelConfig(config);
+ 24:       setIsLoading(true);
+ 25:       useGLTF.preload(config.modelPath, () => {
+ 26:         setIsLoading(false);
+ 27:       });
+ 28:       setSelectedItems([]);
+ 29:     } else {
+ 30:       console.error(`Model configuration for "${currentModelKey}" not found`);
+ 31:     }
+ 32:   }, [currentModelKey]);
+ 33:   const changeModel = useCallback((modelKey) => {
+ 34:     if (modelRegistry[modelKey]) {
+ 35:       setCurrentModelKey(modelKey);
+ 36:     } else {
+ 37:       console.error(`Model "${modelKey}" not found in registry`);
+ 38:     }
+ 39:   }, []);
+ 40:   const toggleItemSelection = useCallback(
+ 41:     (itemId) => {
+ 42:       if (occupiedItems.includes(itemId)) {
+ 43:         return;
+ 44:       }
+ 45:       setSelectedItems((prev) => {
+ 46:         if (prev.includes(itemId)) {
+ 47:           return prev.filter((id) => id !== itemId);
+ 48:         } else {
+ 49:           return [...prev, itemId];
+ 50:         }
+ 51:       });
+ 52:     },
+ 53:     [occupiedItems]
+ 54:   );
+ 55:   const setItemsAsOccupied = useCallback((itemIds) => {
+ 56:     if (!Array.isArray(itemIds)) {
+ 57:       itemIds = [itemIds];
+ 58:     }
+ 59:     setSelectedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
+ 60:     setOccupiedItems((prev) => {
+ 61:       const newOccupied = [...prev];
+ 62:       itemIds.forEach((id) => {
+ 63:         if (!newOccupied.includes(id)) {
+ 64:           newOccupied.push(id);
+ 65:         }
+ 66:       });
+ 67:       return newOccupied;
+ 68:     });
+ 69:   }, []);
+ 70:   const clearOccupancy = useCallback((itemIds) => {
+ 71:     if (!Array.isArray(itemIds)) {
+ 72:       itemIds = [itemIds];
+ 73:     }
+ 74:     setOccupiedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
+ 75:   }, []);
+ 76:   const availableItems =
+ 77:     modelConfig?.selectableItems.map((item) => item.id) || [];
+ 78:   const contextValue = {
+ 79:     currentModelKey,
+ 80:     modelConfig,
+ 81:     isLoading,
+ 82:     selectedItems,
+ 83:     occupiedItems,
+ 84:     availableItems,
+ 85:     changeModel,
+ 86:     toggleItemSelection,
+ 87:     setSelectedItems,
+ 88:     setOccupiedItems,
+ 89:     setItemsAsOccupied,
+ 90:     clearOccupancy,
+ 91:   };
+ 92:   return (
+ 93:     <ModelContext.Provider value={contextValue}>
+ 94:       {children}
+ 95:     </ModelContext.Provider>
+ 96:   );
+ 97: };
+ 98: export const useModel = () => {
+ 99:   const context = useContext(ModelContext);
+100:   if (!context) {
+101:     throw new Error("useModel must be used within a ModelProvider");
+102:   }
+103:   return context;
+104: };
 
 ================
 File: src/hooks/useContentHeight.js
 ================
  1: import { useEffect } from "react";
- 2: 
- 3: export const useContentHeight = () => {
- 4:   useEffect(() => {
- 5:     const postMessageToRN = (message) => {
- 6:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
- 7:         window.ReactNativeWebView.postMessage(JSON.stringify(message));
- 8:       }
- 9:     };
-10: 
-11:     const sendHeight = () => {
-12:       const height = document.body.scrollHeight;
-13:       postMessageToRN({ type: "contentHeight", height });
-14:     };
-15: 
-16: 
-17:     sendHeight();
-18: 
-19: 
-20:     window.addEventListener("resize", sendHeight);
-21: 
-22: 
-23:     const observer = new MutationObserver(sendHeight);
-24:     observer.observe(document.body, {
-25:       childList: true,
-26:       subtree: true,
-27:       attributes: true,
-28:     });
-29: 
-30: 
-31:     return () => {
-32:       window.removeEventListener("resize", sendHeight);
-33:       observer.disconnect();
-34:     };
-35:   }, []);
-36: };
+ 2: export const useContentHeight = () => {
+ 3:   useEffect(() => {
+ 4:     const postMessageToRN = (message) => {
+ 5:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+ 6:         window.ReactNativeWebView.postMessage(JSON.stringify(message));
+ 7:       }
+ 8:     };
+ 9:     const sendHeight = () => {
+10:       const height = document.body.scrollHeight;
+11:       postMessageToRN({ type: "contentHeight", height });
+12:     };
+13:     sendHeight();
+14:     window.addEventListener("resize", sendHeight);
+15:     const observer = new MutationObserver(sendHeight);
+16:     observer.observe(document.body, {
+17:       childList: true,
+18:       subtree: true,
+19:       attributes: true,
+20:     });
+21:     return () => {
+22:       window.removeEventListener("resize", sendHeight);
+23:       observer.disconnect();
+24:     };
+25:   }, []);
+26: };
 
 ================
 File: src/hooks/useDebouncedHover.js
 ================
  1: import { useState, useCallback } from "react";
  2: import { debounce } from "lodash";
- 3: 
- 4: 
- 5: 
- 6: 
- 7: 
- 8: 
- 9: 
-10: const useDebouncedHover = (delay = 30) => {
-11:   const [hovered, setHovered] = useState(null);
-12: 
-13:   const debouncedSetHovered = useCallback(
-14:     debounce((name) => {
-15:       setHovered(name);
-16:     }, delay),
-17:     [delay]
+ 3: const useDebouncedHover = (delay = 30) => {
+ 4:   const [hovered, setHovered] = useState(null);
+ 5:   const debouncedSetHovered = useCallback(
+ 6:     debounce((name) => {
+ 7:       setHovered(name);
+ 8:     }, delay),
+ 9:     [delay]
+10:   );
+11:   const handlePointerOver = useCallback(
+12:     (name, occupiedChairs) => (e) => {
+13:       e.stopPropagation();
+14:       if (occupiedChairs.includes(name)) return;
+15:       debouncedSetHovered(name);
+16:     },
+17:     [debouncedSetHovered]
 18:   );
-19: 
-20:   const handlePointerOver = useCallback(
-21:     (name, occupiedChairs) => (e) => {
-22:       e.stopPropagation();
-23:       if (occupiedChairs.includes(name)) return;
-24:       debouncedSetHovered(name);
-25:     },
-26:     [debouncedSetHovered]
-27:   );
-28: 
-29:   const handlePointerOut = useCallback(() => {
-30:     debouncedSetHovered(null);
-31:   }, [debouncedSetHovered]);
-32: 
-33:   return {
-34:     hovered,
-35:     handlePointerOver,
-36:     handlePointerOut,
-37:   };
-38: };
-39: 
-40: export default useDebouncedHover;
+19:   const handlePointerOut = useCallback(() => {
+20:     debouncedSetHovered(null);
+21:   }, [debouncedSetHovered]);
+22:   return {
+23:     hovered,
+24:     handlePointerOver,
+25:     handlePointerOut,
+26:   };
+27: };
+28: export default useDebouncedHover;
 
 ================
 File: src/hooks/useReactNativeMessaging.js
 ================
  1: import { useEffect, useCallback } from "react";
- 2: 
- 3: 
- 4: 
- 5: 
- 6: export const useReactNativeMessaging = (setSelectedItems, setOccupiedItems) => {
- 7: 
- 8:   const postMessageToRN = useCallback((message) => {
- 9:     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-10:       window.ReactNativeWebView.postMessage(JSON.stringify(message));
-11:     }
-12:   }, []);
-13: 
-14: 
-15:   const notifyInteractionStart = useCallback(() => {
-16:     postMessageToRN({ type: "interactionStart" });
-17:   }, [postMessageToRN]);
-18: 
-19: 
-20:   const notifyInteractionEnd = useCallback(() => {
-21:     postMessageToRN({ type: "interactionEnd" });
-22:   }, [postMessageToRN]);
-23: 
-24: 
-25:   useEffect(() => {
-26: 
-27:     window.updateItems = ({
-28:       selectedItems: selected,
-29:       occupiedItems: occupied,
-30:     }) => {
-31:       if (Array.isArray(selected)) {
-32:         setSelectedItems(selected);
-33:       }
-34:       if (Array.isArray(occupied)) {
-35:         setOccupiedItems(occupied);
-36:       }
-37:     };
-38: 
-39:     return () => {
-40:       delete window.updateItems;
-41:     };
-42:   }, [setSelectedItems, setOccupiedItems]);
-43: 
-44:   return {
-45:     postMessageToRN,
-46:     notifyInteractionStart,
-47:     notifyInteractionEnd,
-48:   };
-49: };
+ 2: export const useReactNativeMessaging = (setSelectedItems, setOccupiedItems) => {
+ 3:   const postMessageToRN = useCallback((message) => {
+ 4:     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+ 5:       window.ReactNativeWebView.postMessage(JSON.stringify(message));
+ 6:     }
+ 7:   }, []);
+ 8:   const notifyInteractionStart = useCallback(() => {
+ 9:     postMessageToRN({ type: "interactionStart" });
+10:   }, [postMessageToRN]);
+11:   const notifyInteractionEnd = useCallback(() => {
+12:     postMessageToRN({ type: "interactionEnd" });
+13:   }, [postMessageToRN]);
+14:   useEffect(() => {
+15:     window.updateItems = ({
+16:       selectedItems: selected,
+17:       occupiedItems: occupied,
+18:     }) => {
+19:       if (Array.isArray(selected)) {
+20:         setSelectedItems(selected);
+21:       }
+22:       if (Array.isArray(occupied)) {
+23:         setOccupiedItems(occupied);
+24:       }
+25:     };
+26:     return () => {
+27:       delete window.updateItems;
+28:     };
+29:   }, [setSelectedItems, setOccupiedItems]);
+30:   return {
+31:     postMessageToRN,
+32:     notifyInteractionStart,
+33:     notifyInteractionEnd,
+34:   };
+35: };
 
 ================
 File: src/App.js
@@ -886,82 +728,60 @@ File: src/App.js
  3: import { useReactNativeMessaging } from "./hooks/useReactNativeMessaging";
  4: import { useContentHeight } from "./hooks/useContentHeight";
  5: import { ModelProvider, useModel } from "./context/ModelProvider";
- 6: 
- 7: 
- 8: 
- 9: 
-10: function App() {
-11:   return (
-12:     <ModelProvider initialModelKey="kitchen">
-13:       <RestaurantApp />
-14:     </ModelProvider>
-15:   );
-16: }
-17: 
-18: 
-19: 
-20: 
-21: function RestaurantApp() {
-22: 
-23:   const {
-24:     modelConfig,
-25:     selectedItems,
-26:     occupiedItems,
-27:     setSelectedItems,
-28:     setOccupiedItems,
-29:     toggleItemSelection,
-30:     changeModel,
-31:   } = useModel();
-32: 
-33: 
-34:   const { notifyInteractionStart, notifyInteractionEnd, postMessageToRN } =
-35:     useReactNativeMessaging(setSelectedItems, setOccupiedItems);
-36: 
-37: 
-38:   useContentHeight();
-39: 
-40: 
-41:   const handleItemClicked = (itemId) => {
-42:     toggleItemSelection(itemId);
-43:   };
-44: 
-45: 
-46:   useEffect(() => {
-47: 
-48:     window.changeRestaurantModel = (modelKey) => {
-49:       changeModel(modelKey);
-50: 
-51:       postMessageToRN({
-52:         type: "modelChanged",
-53:         modelKey,
-54:         availableItems: modelConfig.selectableItems.map((item) => item.id),
-55:       });
-56:     };
-57: 
-58:     return () => {
-59:       delete window.changeRestaurantModel;
-60:     };
-61:   }, [changeModel, modelConfig, postMessageToRN]);
-62: 
-63:   return (
-64:     <div
-65:       style={{ width: "100%" }}
-66:       onTouchStart={notifyInteractionStart}
-67:       onTouchEnd={notifyInteractionEnd}
-68:       onMouseDown={notifyInteractionStart}
-69:       onMouseUp={notifyInteractionEnd}
-70:     >
-71:       <Scene
-72:         modelConfig={modelConfig}
-73:         selectedItems={selectedItems}
-74:         occupiedItems={occupiedItems}
-75:         onItemClicked={handleItemClicked}
-76:       />
-77:     </div>
-78:   );
-79: }
-80: 
-81: export default App;
+ 6: function App() {
+ 7:   return (
+ 8:     <ModelProvider initialModelKey="kitchen">
+ 9:       <RestaurantApp />
+10:     </ModelProvider>
+11:   );
+12: }
+13: function RestaurantApp() {
+14:   const {
+15:     modelConfig,
+16:     selectedItems,
+17:     occupiedItems,
+18:     setSelectedItems,
+19:     setOccupiedItems,
+20:     toggleItemSelection,
+21:     changeModel,
+22:   } = useModel();
+23:   const { notifyInteractionStart, notifyInteractionEnd, postMessageToRN } =
+24:     useReactNativeMessaging(setSelectedItems, setOccupiedItems);
+25:   useContentHeight();
+26:   const handleItemClicked = (itemId) => {
+27:     toggleItemSelection(itemId);
+28:   };
+29:   useEffect(() => {
+30:     window.changeRestaurantModel = (modelKey) => {
+31:       changeModel(modelKey);
+32:       postMessageToRN({
+33:         type: "modelChanged",
+34:         modelKey,
+35:         availableItems: modelConfig.selectableItems.map((item) => item.id),
+36:       });
+37:     };
+38:     return () => {
+39:       delete window.changeRestaurantModel;
+40:     };
+41:   }, [changeModel, modelConfig, postMessageToRN]);
+42:   return (
+43:     <div
+44:       style={{ width: "100%" }}
+45:       onTouchStart={notifyInteractionStart}
+46:       onTouchEnd={notifyInteractionEnd}
+47:       onMouseDown={notifyInteractionStart}
+48:       onMouseUp={notifyInteractionEnd}
+49:     >
+50:       <Scene
+51:         modelConfig={modelConfig}
+52:         selectedItems={selectedItems}
+53:         occupiedItems={occupiedItems}
+54:         onItemClicked={handleItemClicked}
+55:       />
+56:     </div>
+57:   );
+58: }
+59: export default App;
 
 ================
 File: src/index.css
@@ -974,11 +794,10 @@ File: src/index.css
  6:   -webkit-font-smoothing: antialiased;
  7:   -moz-osx-font-smoothing: grayscale;
  8: }
- 9: 
-10: code {
-11:   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-12:     monospace;
-13: }
+ 9: code {
+10:   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+11:     monospace;
+12: }
 
 ================
 File: src/index.js
@@ -988,18 +807,13 @@ File: src/index.js
  3: import "./index.css";
  4: import App from "./App";
  5: import reportWebVitals from "./reportWebVitals";
- 6: 
- 7: const root = ReactDOM.createRoot(document.getElementById("root"));
- 8: root.render(
- 9:   <React.StrictMode>
-10:     <App />
-11:   </React.StrictMode>
-12: );
-13: 
-14: 
-15: 
-16: 
-17: reportWebVitals();
+ 6: const root = ReactDOM.createRoot(document.getElementById("root"));
+ 7: root.render(
+ 8:   <React.StrictMode>
+ 9:     <App />
+10:   </React.StrictMode>
+11: );
+12: reportWebVitals();
 
 ================
 File: src/reportWebVitals.js
@@ -1015,8 +829,7 @@ File: src/reportWebVitals.js
  9:     });
 10:   }
 11: };
-12: 
-13: export default reportWebVitals;
+12: export default reportWebVitals;
 
 ================
 File: .gitignore
@@ -1110,9 +923,11 @@ File: repomix.config.json
 10:     "filePath": "repomix-output.txt",
 11:     "removeComments": true,
 12:     "showLineNumbers": true,
-13:     "topFilesLength": 10
-14:   }
-15: }
+13:     "topFilesLength": 10,
+14:     "removeEmptyLines": true,
+15:     "copyToClipboard": true
+16:   }
+17: }
 
 ================
 File: webpack.config.js

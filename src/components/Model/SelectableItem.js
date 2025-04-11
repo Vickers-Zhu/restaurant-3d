@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 // src/components/Model/SelectableItem.js
 import React, { useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";

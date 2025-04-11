@@ -36,11 +36,13 @@ export const useReactNativeMessaging = (setSelectedItems, setOccupiedItems) => {
         setOccupiedItems(occupied);
       }
     };
-
+    postMessageToRN({
+      type: "webViewReady",
+    });
     return () => {
       delete window.updateItems;
     };
-  }, [setSelectedItems, setOccupiedItems]);
+  }, [setSelectedItems, setOccupiedItems, postMessageToRN]);
 
   return {
     postMessageToRN,

@@ -12,9 +12,11 @@ const useDebouncedHover = (delay = 30) => {
   const [hovered, setHovered] = useState(null);
 
   const debouncedSetHovered = useCallback(
-    debounce((name) => {
-      setHovered(name);
-    }, delay),
+    (name) => {
+      debounce(() => {
+        setHovered(name);
+      }, delay)();
+    },
     [delay]
   );
 
