@@ -58,7 +58,11 @@ src/
       SelectableItem.js
     Scene.js
   configs/
+    CafeModelConfig.js
+    KitchenModelConfig.js
     ModelConfig.js
+    ModelConfigForCafe.js
+    ModelRegistry.js
   context/
     ModelProvider.js
   hooks/
@@ -129,387 +133,3083 @@ File: src/components/Model/Effects.js
 ================
 File: src/components/Model/GenericModel.js
 ================
- 1: import React, { useRef, useCallback } from "react";
- 2: import { useGLTF } from "@react-three/drei";
- 3: import { Clock } from "three";
- 4: import SelectableItem from "./SelectableItem";
- 5: import Effects from "./Effects";
- 6: import useDebouncedHover from "../../hooks/useDebouncedHover";
- 7: export function GenericModel({
- 8:   modelConfig,
- 9:   selectedItems,
-10:   occupiedItems,
-11:   onItemClicked,
-12:   ...props
-13: }) {
-14:   const { nodes, materials } = useGLTF(modelConfig.modelPath);
-15:   const groupRef = useRef();
-16:   const clock = useRef(new Clock());
-17:   const { hovered, handlePointerOver, handlePointerOut } =
-18:     useDebouncedHover(30);
-19:   const handleClick = useCallback(
-20:     (itemId) => (e) => {
-21:       e.stopPropagation();
-22:       if (onItemClicked) {
-23:         onItemClicked(itemId);
-24:       }
-25:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-26:         window.ReactNativeWebView.postMessage(
-27:           JSON.stringify({ type: "itemClicked", id: itemId })
-28:         );
-29:       }
-30:     },
-31:     [onItemClicked]
-32:   );
-33:   return (
-34:     <group ref={groupRef} {...props}>
-35:       {}
-36:       <Effects
-37:         selectedItems={selectedItems}
-38:         occupiedItems={occupiedItems}
-39:         selectionColor={modelConfig.selectionColor}
-40:         occupiedColor={modelConfig.occupiedColor}
-41:       />
-42:       {}
-43:       {modelConfig.staticItems.map((item) => (
-44:         <mesh
-45:           key={item.name}
-46:           geometry={nodes[item.geometryName].geometry}
-47:           material={materials[item.materialName]}
-48:         />
-49:       ))}
-50:       {}
-51:       {modelConfig.selectableItems.map((item) => {
-52:         const selected = selectedItems.includes(item.id);
-53:         const occupied = occupiedItems.includes(item.id);
-54:         return (
-55:           <SelectableItem
-56:             key={item.id}
-57:             itemConfig={item}
-58:             geometryOuter={nodes[item.outerGeometryName].geometry}
-59:             geometryInner={
-60:               item.innerGeometryName
-61:                 ? nodes[item.innerGeometryName].geometry
-62:                 : null
-63:             }
-64:             materialOuter={materials[item.outerMaterialName]}
-65:             materialInner={
-66:               item.innerMaterialName ? materials[item.innerMaterialName] : null
-67:             }
-68:             modelConfig={modelConfig}
-69:             selected={selected}
-70:             occupied={occupied}
-71:             onPointerOver={() => handlePointerOver(item.id, occupiedItems)}
-72:             onPointerOut={handlePointerOut}
-73:             onClick={handleClick(item.id)}
-74:             clock={clock.current}
-75:           />
-76:         );
-77:       })}
-78:     </group>
-79:   );
-80: }
-81: export const preloadModel = (modelConfig) => {
-82:   useGLTF.preload(modelConfig.modelPath);
-83: };
+  1: import React, { useRef, useCallback, useEffect } from "react";
+  2: import { useGLTF } from "@react-three/drei";
+  3: import { Clock } from "three";
+  4: import SelectableItem from "./SelectableItem";
+  5: import Effects from "./Effects";
+  6: import useDebouncedHover from "../../hooks/useDebouncedHover";
+  7: export function GenericModel({
+  8:   modelConfig,
+  9:   selectedItems,
+ 10:   occupiedItems,
+ 11:   onItemClicked,
+ 12:   enableDebug = false,
+ 13:   ...props
+ 14: }) {
+ 15:   const { nodes, materials } = useGLTF(modelConfig.modelPath);
+ 16:   const groupRef = useRef();
+ 17:   const clock = useRef(new Clock());
+ 18:   const { handlePointerOver, handlePointerOut } = useDebouncedHover(30);
+ 19:   useEffect(() => {
+ 20:     if (enableDebug) {
+ 21:       console.log("=== MODEL DEBUG INFO ===");
+ 22:       console.log("Available nodes:", Object.keys(nodes));
+ 23:       console.log("Available materials:", Object.keys(materials));
+ 24:       console.log("Model config:", modelConfig);
+ 25:       console.log("\n=== STATIC ITEMS CHECK ===");
+ 26:       modelConfig.staticItems.forEach((item, index) => {
+ 27:         const hasGeometry = nodes[item.geometryName];
+ 28:         const hasMaterial = materials[item.materialName];
+ 29:         console.log(`Static Item ${index}: ${item.name}`);
+ 30:         console.log(
+ 31:           `  Geometry '${item.geometryName}': ${
+ 32:             hasGeometry ? "✓ Found" : "✗ MISSING"
+ 33:           }`
+ 34:         );
+ 35:         console.log(
+ 36:           `  Material '${item.materialName}': ${
+ 37:             hasMaterial ? "✓ Found" : "✗ MISSING"
+ 38:           }`
+ 39:         );
+ 40:         if (!hasGeometry) {
+ 41:           console.warn(
+ 42:             `Missing geometry for static item: ${item.name} -> ${item.geometryName}`
+ 43:           );
+ 44:         }
+ 45:         if (!hasMaterial) {
+ 46:           console.warn(
+ 47:             `Missing material for static item: ${item.name} -> ${item.materialName}`
+ 48:           );
+ 49:         }
+ 50:       });
+ 51:       console.log("\n=== SELECTABLE ITEMS CHECK ===");
+ 52:       modelConfig.selectableItems.forEach((item, index) => {
+ 53:         console.log(`Selectable Item ${index}: ${item.id} (${item.type})`);
+ 54:         console.log(`  Geometries count: ${item.geometries?.length || 0}`);
+ 55:         if (item.geometries) {
+ 56:           item.geometries.forEach((geo, geoIndex) => {
+ 57:             const hasGeometry = nodes[geo.geometryName];
+ 58:             const hasMaterial = materials[geo.materialName];
+ 59:             console.log(`    Part ${geoIndex}:`);
+ 60:             console.log(
+ 61:               `      Geometry '${geo.geometryName}': ${
+ 62:                 hasGeometry ? "✓ Found" : "✗ MISSING"
+ 63:               }`
+ 64:             );
+ 65:             console.log(
+ 66:               `      Material '${geo.materialName}': ${
+ 67:                 hasMaterial ? "✓ Found" : "✗ MISSING"
+ 68:               }`
+ 69:             );
+ 70:             if (!hasGeometry) {
+ 71:               console.warn(
+ 72:                 `Missing geometry for selectable item part: ${item.id} -> ${geo.geometryName}`
+ 73:               );
+ 74:             }
+ 75:             if (!hasMaterial) {
+ 76:               console.warn(
+ 77:                 `Missing material for selectable item part: ${item.id} -> ${geo.materialName}`
+ 78:               );
+ 79:             }
+ 80:           });
+ 81:         }
+ 82:       });
+ 83:       console.log("\n=== SAMPLE AVAILABLE NODES ===");
+ 84:       Object.keys(nodes)
+ 85:         .slice(0, 10)
+ 86:         .forEach((key) => {
+ 87:           console.log(`Node: ${key}`, nodes[key]);
+ 88:         });
+ 89:       console.log("\n=== SAMPLE AVAILABLE MATERIALS ===");
+ 90:       Object.keys(materials)
+ 91:         .slice(0, 10)
+ 92:         .forEach((key) => {
+ 93:           console.log(`Material: ${key}`, materials[key]);
+ 94:         });
+ 95:     }
+ 96:   }, [nodes, materials, modelConfig, enableDebug]);
+ 97:   const handleClick = useCallback(
+ 98:     (itemId) => (e) => {
+ 99:       e.stopPropagation();
+100:       if (onItemClicked) {
+101:         onItemClicked(itemId);
+102:       }
+103:       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+104:         window.ReactNativeWebView.postMessage(
+105:           JSON.stringify({ type: "itemClicked", id: itemId })
+106:         );
+107:       }
+108:     },
+109:     [onItemClicked]
+110:   );
+111:   const prepareItemGeometries = (item) => {
+112:     if (!item.geometries) {
+113:       if (enableDebug) {
+114:         console.warn(`Item ${item.id} has no geometries array`);
+115:       }
+116:       return [];
+117:     }
+118:     return item.geometries
+119:       .map((geoConfig) => {
+120:         const geometry = nodes[geoConfig.geometryName];
+121:         const material = materials[geoConfig.materialName];
+122:         if (!geometry || !material) {
+123:           if (enableDebug) {
+124:             console.warn(
+125:               `Skipping geometry part for item ${item.id}: missing ${
+126:                 !geometry ? "geometry" : "material"
+127:               } (${geoConfig.geometryName} -> ${geoConfig.materialName})`
+128:             );
+129:           }
+130:           return null;
+131:         }
+132:         return {
+133:           geometry: geometry.geometry,
+134:           material: material,
+135:           geometryName: geoConfig.geometryName,
+136:           materialName: geoConfig.materialName,
+137:         };
+138:       })
+139:       .filter(Boolean);
+140:   };
+141:   return (
+142:     <group ref={groupRef} {...props}>
+143:       {}
+144:       <Effects
+145:         selectedItems={selectedItems}
+146:         occupiedItems={occupiedItems}
+147:         selectionColor={modelConfig.selectionColor}
+148:         occupiedColor={modelConfig.occupiedColor}
+149:       />
+150:       {}
+151:       {modelConfig.staticItems.map((item) => {
+152:         const geometry = nodes[item.geometryName];
+153:         const material = materials[item.materialName];
+154:         if (!geometry || !material) {
+155:           if (enableDebug) {
+156:             console.warn(
+157:               `Skipping static item ${item.name}: missing ${
+158:                 !geometry ? "geometry" : "material"
+159:               }`
+160:             );
+161:           }
+162:           return null;
+163:         }
+164:         return (
+165:           <mesh
+166:             key={item.name}
+167:             geometry={geometry.geometry}
+168:             material={material}
+169:             castShadow
+170:             receiveShadow
+171:           />
+172:         );
+173:       })}
+174:       {}
+175:       {modelConfig.selectableItems.map((item) => {
+176:         const selected = selectedItems.includes(item.id);
+177:         const occupied = occupiedItems.includes(item.id);
+178:         const geometries = prepareItemGeometries(item);
+179:         if (geometries.length === 0) {
+180:           if (enableDebug) {
+181:             console.warn(
+182:               `Skipping selectable item ${item.id}: no valid geometries`
+183:             );
+184:           }
+185:           return null;
+186:         }
+187:         return (
+188:           <SelectableItem
+189:             key={item.id}
+190:             itemConfig={item}
+191:             geometries={geometries}
+192:             materials={materials}
+193:             modelConfig={modelConfig}
+194:             selected={selected}
+195:             occupied={occupied}
+196:             onPointerOver={() => handlePointerOver(item.id, occupiedItems)}
+197:             onPointerOut={handlePointerOut}
+198:             onClick={handleClick(item.id)}
+199:             clock={clock.current}
+200:           />
+201:         );
+202:       })}
+203:     </group>
+204:   );
+205: }
+206: export const preloadModel = (modelConfig) => {
+207:   useGLTF.preload(modelConfig.modelPath);
+208: };
 
 ================
 File: src/components/Model/SelectableItem.js
 ================
- 1: import React, { useRef, useEffect } from "react";
- 2: import { useFrame } from "@react-three/fiber";
- 3: const SelectableItem = ({
- 4:   itemConfig,
- 5:   geometryOuter,
- 6:   geometryInner,
- 7:   materialOuter,
- 8:   materialInner,
- 9:   modelConfig,
-10:   selected,
-11:   occupied,
-12:   onPointerOver,
-13:   onPointerOut,
-14:   onClick,
-15:   clock,
-16: }) => {
-17:   const meshRef = useRef();
-18:   const innerMeshRef = useRef();
-19:   const { id, type } = itemConfig;
-20:   const emissiveMaterialOuterSelected = modelConfig.createEmissiveMaterial(
-21:     materialOuter,
-22:     modelConfig.selectionColor
-23:   );
-24:   const emissiveMaterialOuterOccupied = modelConfig.createEmissiveMaterial(
-25:     materialOuter,
-26:     modelConfig.occupiedColor
-27:   );
-28:   const emissiveMaterialInnerSelected = modelConfig.createEmissiveMaterial(
-29:     materialInner,
-30:     modelConfig.selectionColor
-31:   );
-32:   const emissiveMaterialInnerOccupied = modelConfig.createEmissiveMaterial(
-33:     materialInner,
-34:     modelConfig.occupiedColor
-35:   );
-36:   useEffect(() => {
-37:     if (selected) {
-38:       meshRef.current.material = emissiveMaterialOuterSelected;
-39:       if (innerMeshRef.current) {
-40:         innerMeshRef.current.material = emissiveMaterialInnerSelected;
-41:       }
-42:     } else if (occupied) {
-43:       meshRef.current.material = emissiveMaterialOuterOccupied;
-44:       if (innerMeshRef.current) {
-45:         innerMeshRef.current.material = emissiveMaterialInnerOccupied;
-46:       }
-47:     } else {
-48:       meshRef.current.material = materialOuter;
-49:       if (innerMeshRef.current) {
-50:         innerMeshRef.current.material = materialInner;
-51:       }
-52:     }
-53:   }, [
-54:     selected,
-55:     occupied,
-56:     emissiveMaterialOuterSelected,
-57:     emissiveMaterialOuterOccupied,
-58:     emissiveMaterialInnerSelected,
-59:     emissiveMaterialInnerOccupied,
-60:     materialOuter,
-61:     materialInner,
-62:   ]);
-63:   useFrame(() => {
-64:     if (selected && meshRef.current) {
-65:       const elapsed = clock.getElapsedTime();
-66:       const scale =
-67:         1 +
-68:         modelConfig.animationScale *
-69:           Math.sin(elapsed * modelConfig.animationSpeed);
-70:       meshRef.current.scale.set(scale, scale, scale);
-71:     }
-72:   });
-73:   return (
-74:     <mesh
-75:       ref={meshRef}
-76:       geometry={geometryOuter}
-77:       onPointerOver={onPointerOver}
-78:       onPointerOut={onPointerOut}
-79:       onClick={onClick}
-80:       name={id}
-81:     >
-82:       {geometryInner && (
-83:         <mesh ref={innerMeshRef} geometry={geometryInner} name={id} />
-84:       )}
-85:     </mesh>
-86:   );
-87: };
-88: export default SelectableItem;
+  1: import React, { useRef, useEffect } from "react";
+  2: import { useFrame } from "@react-three/fiber";
+  3: const SelectableItem = ({
+  4:   itemConfig,
+  5:   geometries,
+  6:   materials,
+  7:   modelConfig,
+  8:   selected,
+  9:   occupied,
+ 10:   onPointerOver,
+ 11:   onPointerOut,
+ 12:   onClick,
+ 13:   clock,
+ 14: }) => {
+ 15:   const groupRef = useRef();
+ 16:   const meshRefs = useRef([]);
+ 17:   const { id } = itemConfig;
+ 18:   const emissiveMaterials = geometries.map(({ materialName }) => {
+ 19:     const baseMaterial = materials[materialName];
+ 20:     return {
+ 21:       selected: modelConfig.createEmissiveMaterial(
+ 22:         baseMaterial,
+ 23:         modelConfig.selectionColor
+ 24:       ),
+ 25:       occupied: modelConfig.createEmissiveMaterial(
+ 26:         baseMaterial,
+ 27:         modelConfig.occupiedColor
+ 28:       ),
+ 29:       original: baseMaterial,
+ 30:     };
+ 31:   });
+ 32:   useEffect(() => {
+ 33:     meshRefs.current.forEach((meshRef, index) => {
+ 34:       if (!meshRef.current) return;
+ 35:       const materialSet = emissiveMaterials[index];
+ 36:       if (!materialSet) return;
+ 37:       if (selected) {
+ 38:         meshRef.current.material = materialSet.selected;
+ 39:       } else if (occupied) {
+ 40:         meshRef.current.material = materialSet.occupied;
+ 41:       } else {
+ 42:         meshRef.current.material = materialSet.original;
+ 43:         if (meshRef.current) {
+ 44:           meshRef.current.scale.set(1, 1, 1);
+ 45:         }
+ 46:       }
+ 47:     });
+ 48:   }, [selected, occupied, emissiveMaterials]);
+ 49:   useFrame(() => {
+ 50:     if (selected && groupRef.current) {
+ 51:       const elapsed = clock.getElapsedTime();
+ 52:       const intensity =
+ 53:         modelConfig.emissiveIntensity *
+ 54:         (0.8 + 0.2 * Math.sin(elapsed * modelConfig.animationSpeed));
+ 55:       meshRefs.current.forEach((meshRef) => {
+ 56:         if (meshRef.current && meshRef.current.material.emissive) {
+ 57:           meshRef.current.material.emissiveIntensity = intensity;
+ 58:         }
+ 59:       });
+ 60:     } else if (occupied && groupRef.current) {
+ 61:       meshRefs.current.forEach((meshRef) => {
+ 62:         if (meshRef.current && meshRef.current.material.emissive) {
+ 63:           meshRef.current.material.emissiveIntensity =
+ 64:             modelConfig.emissiveIntensity * 0.7;
+ 65:         }
+ 66:       });
+ 67:     }
+ 68:   });
+ 69:   useEffect(() => {
+ 70:     meshRefs.current = meshRefs.current.slice(0, geometries.length);
+ 71:     while (meshRefs.current.length < geometries.length) {
+ 72:       meshRefs.current.push(React.createRef());
+ 73:     }
+ 74:   }, [geometries.length]);
+ 75:   return (
+ 76:     <group
+ 77:       ref={groupRef}
+ 78:       onPointerOver={onPointerOver}
+ 79:       onPointerOut={onPointerOut}
+ 80:       onClick={onClick}
+ 81:       name={id}
+ 82:     >
+ 83:       {geometries.map((geometryConfig, index) => {
+ 84:         if (!geometryConfig.geometry || !geometryConfig.material) {
+ 85:           return null;
+ 86:         }
+ 87:         return (
+ 88:           <mesh
+ 89:             key={`${id}-${index}`}
+ 90:             ref={meshRefs.current[index]}
+ 91:             geometry={geometryConfig.geometry}
+ 92:             material={geometryConfig.material}
+ 93:             name={`${id}-part-${index}`}
+ 94:             castShadow
+ 95:             receiveShadow
+ 96:           />
+ 97:         );
+ 98:       })}
+ 99:     </group>
+100:   );
+101: };
+102: export default SelectableItem;
 
 ================
 File: src/components/Scene.js
 ================
- 1: import React from "react";
- 2: import { Canvas } from "@react-three/fiber";
- 3: import { Sky, Bvh, OrbitControls } from "@react-three/drei";
- 4: import { Selection } from "@react-three/postprocessing";
- 5: import { GenericModel } from "./Model/GenericModel";
- 6: export function Scene({
- 7:   modelConfig,
- 8:   selectedItems,
- 9:   occupiedItems,
-10:   onItemClicked,
-11:   sceneStyle,
-12: }) {
-13:   const defaultStyle = {
-14:     width: "375px",
-15:     height: "667px",
-16:     margin: "0 auto",
-17:     borderRadius: "15px",
-18:     boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2), 0 5px 15px rgba(0, 0, 0, 0.15)",
-19:     background: "linear-gradient(135deg, #f5f5f5, #eaeaea)",
-20:     border: "1px solid rgba(0, 0, 0, 0.1)",
-21:   };
-22:   const canvasStyle = { ...defaultStyle, ...sceneStyle };
-23:   return (
-24:     <Canvas
-25:       style={canvasStyle}
-26:       flat
-27:       dpr={[1, 1.5]}
-28:       gl={{ antialias: false }}
-29:       camera={{
-30:         position: modelConfig.initialCameraPosition,
-31:         fov: modelConfig.cameraFov,
-32:       }}
-33:     >
-34:       <ambientLight intensity={1.5 * Math.PI} />
-35:       <Sky />
-36:       <Bvh firstHitOnly>
-37:         <Selection>
-38:           <GenericModel
-39:             rotation={[0, 0, 0]}
-40:             position={[-0.8, 0, 0]}
-41:             modelConfig={modelConfig}
-42:             selectedItems={selectedItems}
-43:             occupiedItems={occupiedItems}
-44:             onItemClicked={onItemClicked}
-45:           />
-46:         </Selection>
-47:       </Bvh>
-48:       <OrbitControls
-49:         enableZoom={true}
-50:         enablePan={true}
-51:         enableRotate={true}
-52:         panSpeed={1}
-53:         zoomSpeed={1.5}
-54:         rotateSpeed={1.2}
-55:         screenSpacePanning={true}
-56:         touchPan={1}
-57:         touchRotate={2}
-58:         touchZoom={2}
-59:       />
-60:     </Canvas>
-61:   );
-62: }
-63: export default Scene;
+  1: import React from "react";
+  2: import { Canvas } from "@react-three/fiber";
+  3: import { Sky, Bvh, OrbitControls, Environment } from "@react-three/drei";
+  4: import { Selection } from "@react-three/postprocessing";
+  5: import { GenericModel } from "./Model/GenericModel";
+  6: import * as THREE from "three";
+  7: export function Scene({
+  8:   modelConfig,
+  9:   selectedItems,
+ 10:   occupiedItems,
+ 11:   onItemClicked,
+ 12:   sceneStyle,
+ 13:   enableDebug = false,
+ 14: }) {
+ 15:   const defaultStyle = {
+ 16:     width: "375px",
+ 17:     height: "667px",
+ 18:     margin: "0 auto",
+ 19:     borderRadius: "15px",
+ 20:     boxShadow: "0 15px 30px rgba(0, 0, 0, 0.2), 0 5px 15px rgba(0, 0, 0, 0.15)",
+ 21:     background: "linear-gradient(135deg, #f5f5f5, #eaeaea)",
+ 22:     border: "1px solid rgba(0, 0, 0, 0.1)",
+ 23:   };
+ 24:   const canvasStyle = { ...defaultStyle, ...sceneStyle };
+ 25:   return (
+ 26:     <Canvas
+ 27:       style={canvasStyle}
+ 28:       flat={false}
+ 29:       dpr={[1, 1.5]}
+ 30:       gl={{
+ 31:         antialias: true,
+ 32:         toneMapping: THREE.ACESFilmicToneMapping,
+ 33:         toneMappingExposure: 1.0,
+ 34:         outputColorSpace: THREE.SRGBColorSpace,
+ 35:       }}
+ 36:       camera={{
+ 37:         position: modelConfig.initialCameraPosition,
+ 38:         fov: modelConfig.cameraFov,
+ 39:       }}
+ 40:       shadows
+ 41:     >
+ 42:       {}
+ 43:       <ambientLight intensity={0.4} color="#ffffff" />
+ 44:       {}
+ 45:       <directionalLight
+ 46:         position={[10, 10, 5]}
+ 47:         intensity={1}
+ 48:         color="#ffffff"
+ 49:         castShadow
+ 50:         shadow-mapSize-width={2048}
+ 51:         shadow-mapSize-height={2048}
+ 52:         shadow-camera-far={50}
+ 53:         shadow-camera-left={-20}
+ 54:         shadow-camera-right={20}
+ 55:         shadow-camera-top={20}
+ 56:         shadow-camera-bottom={-20}
+ 57:       />
+ 58:       {}
+ 59:       <directionalLight
+ 60:         position={[-5, 5, -5]}
+ 61:         intensity={0.3}
+ 62:         color="#ffffff"
+ 63:       />
+ 64:       {}
+ 65:       <directionalLight
+ 66:         position={[0, 5, -10]}
+ 67:         intensity={0.2}
+ 68:         color="#f0f8ff"
+ 69:       />
+ 70:       {}
+ 71:       <Environment preset="apartment" background={false} />
+ 72:       {}
+ 73:       <Sky
+ 74:         distance={450000}
+ 75:         sunPosition={[0, 1, 0]}
+ 76:         inclination={0}
+ 77:         azimuth={0.25}
+ 78:       />
+ 79:       <Bvh firstHitOnly>
+ 80:         <Selection>
+ 81:           <GenericModel
+ 82:             rotation={[0, 0, 0]}
+ 83:             position={[-0.8, 0, 0]}
+ 84:             modelConfig={modelConfig}
+ 85:             selectedItems={selectedItems}
+ 86:             occupiedItems={occupiedItems}
+ 87:             onItemClicked={onItemClicked}
+ 88:             enableDebug={enableDebug}
+ 89:           />
+ 90:         </Selection>
+ 91:       </Bvh>
+ 92:       <OrbitControls
+ 93:         target={modelConfig.cameraTarget}
+ 94:         enableZoom={true}
+ 95:         enablePan={true}
+ 96:         enableRotate={true}
+ 97:         panSpeed={1}
+ 98:         zoomSpeed={1.5}
+ 99:         rotateSpeed={1.2}
+100:         screenSpacePanning={true}
+101:         touchPan={1}
+102:         touchRotate={2}
+103:         touchZoom={2}
+104:         minDistance={5}
+105:         maxDistance={50}
+106:       />
+107:     </Canvas>
+108:   );
+109: }
+110: export default Scene;
+
+================
+File: src/configs/CafeModelConfig.js
+================
+   1: import { RestaurantModelConfig } from "./ModelConfig";
+   2: import * as THREE from "three";
+   3: export const cafeModelConfig = new RestaurantModelConfig({
+   4:   modelPath: "/Cafe.gltf",
+   5:   cameraTarget: [-5, 10, 0],
+   6:   initialCameraPosition: [-5, 10, 20],
+   7:   cameraFov: 50,
+   8:   selectionColor: new THREE.Color(0x00ff00),
+   9:   occupiedColor: new THREE.Color(0xff0000),
+  10:   emissiveIntensity: 1.2,
+  11:   animationSpeed: 3,
+  12:   selectableItems: [
+  13:     {
+  14:       type: "sofa",
+  15:       id: "SOFA01_TABLE01",
+  16:       geometries: [
+  17:         {
+  18:           geometryName: "SOFA01_TABLE01",
+  19:           materialName: "meridienne_001___mat_tissus078_bissg",
+  20:         },
+  21:       ],
+  22:     },
+  23:     {
+  24:       type: "sofa",
+  25:       id: "SOFA01_TABLE02",
+  26:       geometries: [
+  27:         {
+  28:           geometryName: "SOFA01_TABLE02",
+  29:           materialName: "meridienne_001___mat_tissus078_bissg",
+  30:         },
+  31:       ],
+  32:     },
+  33:     {
+  34:       type: "sofa",
+  35:       id: "SOFA01_TABLE03",
+  36:       geometries: [
+  37:         {
+  38:           geometryName: "SOFA01_TABLE03",
+  39:           materialName: "meridienne_001___mat_tissus078_bissg",
+  40:         },
+  41:       ],
+  42:     },
+  43:     {
+  44:       type: "sofa",
+  45:       id: "SOFA02_TABLE02",
+  46:       geometries: [
+  47:         {
+  48:           geometryName: "SOFA02_TABLE02",
+  49:           materialName: "meridienne_001___mat_tissus078_bissg",
+  50:         },
+  51:       ],
+  52:     },
+  53:     {
+  54:       type: "sofa",
+  55:       id: "SOFA02_TABLE03",
+  56:       geometries: [
+  57:         {
+  58:           geometryName: "SOFA02_TABLE03",
+  59:           materialName: "meridienne_001___mat_tissus078_bissg",
+  60:         },
+  61:       ],
+  62:     },
+  63:     {
+  64:       type: "chair",
+  65:       id: "CHAIR01_COUNTER",
+  66:       geometries: [
+  67:         {
+  68:           geometryName: "CHAIR01_COUNTER_1",
+  69:           materialName: "pack_004_cuisine_001_chaise___pied",
+  70:         },
+  71:         {
+  72:           geometryName: "CHAIR01_COUNTER_2",
+  73:           materialName: "pack_004_cuisine_001_chaise___rond",
+  74:         },
+  75:         {
+  76:           geometryName: "CHAIR01_COUNTER_3",
+  77:           materialName: "pack_004_cuisine_001_chaise___tour",
+  78:         },
+  79:         {
+  80:           geometryName: "CHAIR01_COUNTER_4",
+  81:           materialName: "pack_004_cuisine_001_chaise___tubes",
+  82:         },
+  83:         {
+  84:           geometryName: "CHAIR01_COUNTER_5",
+  85:           materialName: "bois_046",
+  86:         },
+  87:       ],
+  88:     },
+  89:     {
+  90:       type: "chair",
+  91:       id: "CHAIR01_TABLE01",
+  92:       geometries: [
+  93:         {
+  94:           geometryName: "CHAIR01_TABLE01_1",
+  95:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+  96:         },
+  97:         {
+  98:           geometryName: "CHAIR01_TABLE01_2",
+  99:           materialName: "bleu_002",
+ 100:         },
+ 101:       ],
+ 102:     },
+ 103:     {
+ 104:       type: "chair",
+ 105:       id: "CHAIR01_TABLE05",
+ 106:       geometries: [
+ 107:         {
+ 108:           geometryName: "CHAIR01_TABLE05_1",
+ 109:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 110:         },
+ 111:         {
+ 112:           geometryName: "CHAIR01_TABLE05_2",
+ 113:           materialName: "bleu_002",
+ 114:         },
+ 115:       ],
+ 116:     },
+ 117:     {
+ 118:       type: "chair",
+ 119:       id: "CHAIR01_TABLE06",
+ 120:       geometries: [
+ 121:         {
+ 122:           geometryName: "CHAIR01_TABLE06_1",
+ 123:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 124:         },
+ 125:         {
+ 126:           geometryName: "CHAIR01_TABLE06_2",
+ 127:           materialName: "bleu_012",
+ 128:         },
+ 129:       ],
+ 130:     },
+ 131:     {
+ 132:       type: "chair",
+ 133:       id: "CHAIR02_COUNTER",
+ 134:       geometries: [
+ 135:         {
+ 136:           geometryName: "CHAIR02_COUNTER_1",
+ 137:           materialName: "pack_004_cuisine_001_chaise___tour",
+ 138:         },
+ 139:         {
+ 140:           geometryName: "CHAIR02_COUNTER_2",
+ 141:           materialName: "bois_046",
+ 142:         },
+ 143:         {
+ 144:           geometryName: "CHAIR02_COUNTER_3",
+ 145:           materialName: "pack_004_cuisine_001_chaise___tubes",
+ 146:         },
+ 147:         {
+ 148:           geometryName: "CHAIR02_COUNTER_4",
+ 149:           materialName: "pack_004_cuisine_001_chaise___pied",
+ 150:         },
+ 151:         {
+ 152:           geometryName: "CHAIR02_COUNTER_5",
+ 153:           materialName: "pack_004_cuisine_001_chaise___rond",
+ 154:         },
+ 155:       ],
+ 156:     },
+ 157:     {
+ 158:       type: "chair",
+ 159:       id: "CHAIR02_TABLE01",
+ 160:       geometries: [
+ 161:         {
+ 162:           geometryName: "CHAIR02_TABLE01_1",
+ 163:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 164:         },
+ 165:         {
+ 166:           geometryName: "CHAIR02_TABLE01_2",
+ 167:           materialName: "bleu_012",
+ 168:         },
+ 169:       ],
+ 170:     },
+ 171:     {
+ 172:       type: "chair",
+ 173:       id: "CHAIR02_TABLE05",
+ 174:       geometries: [
+ 175:         {
+ 176:           geometryName: "CHAIR02_TABLE05_1",
+ 177:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 178:         },
+ 179:         {
+ 180:           geometryName: "CHAIR02_TABLE05_2",
+ 181:           materialName: "bleu_004",
+ 182:         },
+ 183:       ],
+ 184:     },
+ 185:     {
+ 186:       type: "chair",
+ 187:       id: "CHAIR02_TABLE06",
+ 188:       geometries: [
+ 189:         {
+ 190:           geometryName: "CHAIR02_TABLE06_1",
+ 191:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 192:         },
+ 193:         {
+ 194:           geometryName: "CHAIR02_TABLE06_2",
+ 195:           materialName: "bleu_004",
+ 196:         },
+ 197:       ],
+ 198:     },
+ 199:     {
+ 200:       type: "chair",
+ 201:       id: "CHAIR03_TABLE05",
+ 202:       geometries: [
+ 203:         {
+ 204:           geometryName: "CHAIR03_TABLE05_1",
+ 205:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 206:         },
+ 207:         {
+ 208:           geometryName: "CHAIR03_TABLE05_2",
+ 209:           materialName: "bleu_012",
+ 210:         },
+ 211:       ],
+ 212:     },
+ 213:     {
+ 214:       type: "chair",
+ 215:       id: "CHAIR03_TABLE06",
+ 216:       geometries: [
+ 217:         {
+ 218:           geometryName: "CHAIR03_TABLE06_1",
+ 219:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 220:         },
+ 221:         {
+ 222:           geometryName: "CHAIR03_TABLE06_2",
+ 223:           materialName: "bleu_002",
+ 224:         },
+ 225:       ],
+ 226:     },
+ 227:     {
+ 228:       type: "chair",
+ 229:       id: "CHAIR04_TABLE05",
+ 230:       geometries: [
+ 231:         {
+ 232:           geometryName: "CHAIR04_TABLE05_1",
+ 233:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 234:         },
+ 235:         {
+ 236:           geometryName: "CHAIR04_TABLE05_2",
+ 237:           materialName: "bleu_002",
+ 238:         },
+ 239:       ],
+ 240:     },
+ 241:     {
+ 242:       type: "chair",
+ 243:       id: "CHAIR04_TABLE06",
+ 244:       geometries: [
+ 245:         {
+ 246:           geometryName: "CHAIR04_TABLE06_1",
+ 247:           materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 248:         },
+ 249:         {
+ 250:           geometryName: "CHAIR04_TABLE06_2",
+ 251:           materialName: "bleu_004",
+ 252:         },
+ 253:       ],
+ 254:     },
+ 255:     {
+ 256:       type: "sofa",
+ 257:       id: "SOFA01_TABLE04",
+ 258:       geometries: [
+ 259:         {
+ 260:           geometryName: "SOFA01_TABLE04_1",
+ 261:           materialName: "tissus_078",
+ 262:         },
+ 263:         {
+ 264:           geometryName: "SOFA01_TABLE04_2",
+ 265:           materialName: "meridienne_001___mat_tissus078_bissg",
+ 266:         },
+ 267:       ],
+ 268:     },
+ 269:     {
+ 270:       type: "sofa",
+ 271:       id: "SOFA02_TABLE04",
+ 272:       geometries: [
+ 273:         {
+ 274:           geometryName: "SOFA02_TABLE04_1",
+ 275:           materialName: "tissus_096",
+ 276:         },
+ 277:         {
+ 278:           geometryName: "SOFA02_TABLE04_2",
+ 279:           materialName: "meridienne_001___mat_tissus078_bissg",
+ 280:         },
+ 281:       ],
+ 282:     },
+ 283:   ],
+ 284:   staticItems: [
+ 285:     {
+ 286:       name: "wood_floor_1",
+ 287:       geometryName: "Object_11",
+ 288:       materialName: "bois_046",
+ 289:     },
+ 290:     {
+ 291:       name: "wood_floor_2",
+ 292:       geometryName: "Object_11001",
+ 293:       materialName: "bois_046",
+ 294:     },
+ 295:     {
+ 296:       name: "wood_floor_3",
+ 297:       geometryName: "Object_11002",
+ 298:       materialName: "bois_046",
+ 299:     },
+ 300:     {
+ 301:       name: "wood_floor_4",
+ 302:       geometryName: "Object_11003",
+ 303:       materialName: "bois_046",
+ 304:     },
+ 305:     {
+ 306:       name: "wood_floor_5",
+ 307:       geometryName: "Object_11004",
+ 308:       materialName: "bois_046",
+ 309:     },
+ 310:     {
+ 311:       name: "wood_floor_6",
+ 312:       geometryName: "Object_11005",
+ 313:       materialName: "bois_046",
+ 314:     },
+ 315:     {
+ 316:       name: "wood_floor_7",
+ 317:       geometryName: "Object_11006",
+ 318:       materialName: "bois_046",
+ 319:     },
+ 320:     {
+ 321:       name: "wood_floor_8",
+ 322:       geometryName: "Object_11007",
+ 323:       materialName: "bois_046",
+ 324:     },
+ 325:     {
+ 326:       name: "wood_floor_9",
+ 327:       geometryName: "Object_11008",
+ 328:       materialName: "bois_046",
+ 329:     },
+ 330:     {
+ 331:       name: "wood_floor_10",
+ 332:       geometryName: "Object_11009",
+ 333:       materialName: "bois_046",
+ 334:     },
+ 335:     {
+ 336:       name: "wood_floor_11",
+ 337:       geometryName: "Object_11010",
+ 338:       materialName: "bois_046",
+ 339:     },
+ 340:     {
+ 341:       name: "wood_floor_12",
+ 342:       geometryName: "Object_11011",
+ 343:       materialName: "bois_046",
+ 344:     },
+ 345:     {
+ 346:       name: "wood_floor_13",
+ 347:       geometryName: "Object_11012",
+ 348:       materialName: "bois_046",
+ 349:     },
+ 350:     {
+ 351:       name: "wood_floor_14",
+ 352:       geometryName: "Object_11013",
+ 353:       materialName: "bois_046",
+ 354:     },
+ 355:     {
+ 356:       name: "wood_floor_15",
+ 357:       geometryName: "Object_11014",
+ 358:       materialName: "bois_046",
+ 359:     },
+ 360:     {
+ 361:       name: "wood_floor_16",
+ 362:       geometryName: "Object_11015",
+ 363:       materialName: "bois_046",
+ 364:     },
+ 365:     {
+ 366:       name: "wood_floor_17",
+ 367:       geometryName: "Object_11016",
+ 368:       materialName: "bois_046",
+ 369:     },
+ 370:     {
+ 371:       name: "wood_floor_18",
+ 372:       geometryName: "Object_11017",
+ 373:       materialName: "bois_046",
+ 374:     },
+ 375:     {
+ 376:       name: "wood_floor_19",
+ 377:       geometryName: "Object_11018",
+ 378:       materialName: "bois_046",
+ 379:     },
+ 380:     {
+ 381:       name: "wood_floor_20",
+ 382:       geometryName: "Object_11019",
+ 383:       materialName: "bois_046",
+ 384:     },
+ 385:     {
+ 386:       name: "wood_floor_21",
+ 387:       geometryName: "Object_11020",
+ 388:       materialName: "bois_046",
+ 389:     },
+ 390:     {
+ 391:       name: "wood_floor_22",
+ 392:       geometryName: "Object_11021",
+ 393:       materialName: "bois_046",
+ 394:     },
+ 395:     {
+ 396:       name: "wood_floor_23",
+ 397:       geometryName: "Object_11022",
+ 398:       materialName: "bois_046",
+ 399:     },
+ 400:     {
+ 401:       name: "wood_floor_24",
+ 402:       geometryName: "Object_11023",
+ 403:       materialName: "bois_046",
+ 404:     },
+ 405:     {
+ 406:       name: "wood_surface_1",
+ 407:       geometryName: "Object_12",
+ 408:       materialName: "bois_054",
+ 409:     },
+ 410:     {
+ 411:       name: "wood_surface_2",
+ 412:       geometryName: "Object_13",
+ 413:       materialName: "bois_055",
+ 414:     },
+ 415:     {
+ 416:       name: "wood_surface_3",
+ 417:       geometryName: "Object_14",
+ 418:       materialName: "bois_089_Room_Entity_Material",
+ 419:     },
+ 420:     {
+ 421:       name: "wood_surface_4",
+ 422:       geometryName: "Object_15",
+ 423:       materialName: "bois_110_Room_Entity_Material",
+ 424:     },
+ 425:     {
+ 426:       name: "wooden_elements",
+ 427:       geometryName: "Object_16",
+ 428:       materialName: "d671effe7f2cd3fb8e0c119e09825243",
+ 429:     },
+ 430:     {
+ 431:       name: "chair_metal_base",
+ 432:       geometryName: "Object_17",
+ 433:       materialName: "eames_chair_dining_2____eames_chair_dinning_bmetal",
+ 434:     },
+ 435:     {
+ 436:       name: "chair_wood_base",
+ 437:       geometryName: "Object_18",
+ 438:       materialName: "eames_chair_dining_2____eames_chair_dinning_bwood",
+ 439:     },
+ 440:     {
+ 441:       name: "main_floor",
+ 442:       geometryName: "Object_19",
+ 443:       materialName: "enduit_004_Room_Entity_Material",
+ 444:     },
+ 445:     {
+ 446:       name: "wall_material_1",
+ 447:       geometryName: "Object_2",
+ 448:       materialName: "700-nw_ovcol81592bcolpic05contpic10",
+ 449:     },
+ 450:     {
+ 451:       name: "walls",
+ 452:       geometryName: "Object_20",
+ 453:       materialName: "enduit_004_Wall_Entity_Material",
+ 454:     },
+ 455:     {
+ 456:       name: "tiled_area",
+ 457:       geometryName: "Object_21",
+ 458:       materialName:
+ 459:         "faience_041_ovcol999999colpic12contpic01_Room_Entity_Material",
+ 460:     },
+ 461:     {
+ 462:       name: "gray_surface_1",
+ 463:       geometryName: "Object_22",
+ 464:       materialName: "gris_004",
+ 465:     },
+ 466:     {
+ 467:       name: "gray_wall",
+ 468:       geometryName: "Object_23",
+ 469:       materialName: "gris_004_Wall_Entity_Material",
+ 470:     },
+ 471:     {
+ 472:       name: "beige_wall_1",
+ 473:       geometryName: "Object_3",
+ 474:       materialName: "beige_004",
+ 475:     },
+ 476:     {
+ 477:       name: "beige_wall_2",
+ 478:       geometryName: "Object_4",
+ 479:       materialName: "beige_004_Wall_Entity_Material",
+ 480:     },
+ 481:     {
+ 482:       name: "beige_wall_3",
+ 483:       geometryName: "Object_5",
+ 484:       materialName: "beige_005_Wall_Entity_Material",
+ 485:     },
+ 486:     {
+ 487:       name: "beige_wall_4",
+ 488:       geometryName: "Object_6",
+ 489:       materialName: "beige_006_Wall_Entity_Material",
+ 490:     },
+ 491:     {
+ 492:       name: "ocre_wall",
+ 493:       geometryName: "Object_52",
+ 494:       materialName: "ocre_001_Wall_Entity_Material",
+ 495:     },
+ 496:     {
+ 497:       name: "hood_element_1",
+ 498:       geometryName: "Object_24",
+ 499:       materialName: "hotte_001___material__177",
+ 500:     },
+ 501:     {
+ 502:       name: "hood_element_2",
+ 503:       geometryName: "Object_25",
+ 504:       materialName: "hotte_001___material__178",
+ 505:     },
+ 506:     {
+ 507:       name: "hood_element_3",
+ 508:       geometryName: "Object_26",
+ 509:       materialName: "hotte_001___material__179",
+ 510:     },
+ 511:     {
+ 512:       name: "pizza_decoration",
+ 513:       geometryName: "Object_27",
+ 514:       materialName:
+ 515:         "kisspng-pizza-knight-italian-cuisine-vegetarian-cuisine-fo-food",
+ 516:     },
+ 517:     {
+ 518:       name: "kitchen_cabinet_1",
+ 519:       geometryName: "Object_28",
+ 520:       materialName: "kitchen_classic_style_base_cabinet_007___phong2sg",
+ 521:     },
+ 522:     {
+ 523:       name: "kitchen_cabinet_2",
+ 524:       geometryName: "Object_29",
+ 525:       materialName: "kitchen_classic_style_base_cabinet_007___phong8sg",
+ 526:     },
+ 527:     {
+ 528:       name: "kitchen_corner_1",
+ 529:       geometryName: "Object_30",
+ 530:       materialName: "kitchen_classic_style_base_corner_001___phong2sg",
+ 531:     },
+ 532:     {
+ 533:       name: "kitchen_corner_2",
+ 534:       geometryName: "Object_31",
+ 535:       materialName: "kitchen_classic_style_base_corner_001___phong8sg",
+ 536:     },
+ 537:     {
+ 538:       name: "dishwasher",
+ 539:       geometryName: "Object_32",
+ 540:       materialName: "kitchen_classic_style_dishwasher_000___phong5sg",
+ 541:     },
+ 542:     {
+ 543:       name: "dishwasher_panel",
+ 544:       geometryName: "Object_33",
+ 545:       materialName: "kitchen_classic_style_dishwasher_000___phong8sg",
+ 546:     },
+ 547:     {
+ 548:       name: "dishwasher_front",
+ 549:       geometryName: "Object_34",
+ 550:       materialName: "kitchen_classic_style_dishwasher_000___phong9sg",
+ 551:     },
+ 552:     {
+ 553:       name: "oven_body",
+ 554:       geometryName: "Object_35",
+ 555:       materialName: "kitchen_classic_style_double_oven_000___phong4sg",
+ 556:     },
+ 557:     {
+ 558:       name: "oven_panel",
+ 559:       geometryName: "Object_36",
+ 560:       materialName: "kitchen_classic_style_double_oven_000___phong5sg",
+ 561:     },
+ 562:     {
+ 563:       name: "oven_knobs",
+ 564:       geometryName: "Object_37",
+ 565:       materialName: "kitchen_classic_style_double_oven_000___phong6sg",
+ 566:     },
+ 567:     {
+ 568:       name: "oven_handle",
+ 569:       geometryName: "Object_38",
+ 570:       materialName: "kitchen_classic_style_double_oven_000___phong7sg",
+ 571:     },
+ 572:     {
+ 573:       name: "oven_glass",
+ 574:       geometryName: "Object_39",
+ 575:       materialName: "kitchen_classic_style_double_oven_000___vitre",
+ 576:     },
+ 577:     {
+ 578:       name: "sink_basin",
+ 579:       geometryName: "Object_42",
+ 580:       materialName: "lavabo_004___lambert3sg",
+ 581:     },
+ 582:     {
+ 583:       name: "sink_faucet",
+ 584:       geometryName: "Object_43",
+ 585:       materialName: "lavabo_004___phong1sg",
+ 586:     },
+ 587:     {
+ 588:       name: "exterior_wall",
+ 589:       geometryName: "Object_40",
+ 590:       materialName: "lambris_ext_003",
+ 591:     },
+ 592:     {
+ 593:       name: "exterior_wall_2",
+ 594:       geometryName: "Object_41",
+ 595:       materialName: "lambris_ext_004",
+ 596:     },
+ 597:     {
+ 598:       name: "food_pasta",
+ 599:       geometryName: "Object_44",
+ 600:       materialName: "makaroniiztverdixsortovpshenitsikakievib_7ff8e298",
+ 601:     },
+ 602:     {
+ 603:       name: "sofa_metal_frame",
+ 604:       geometryName: "Object_45",
+ 605:       materialName: "meridienne_001___bis_mat_metalbasique004sg",
+ 606:     },
+ 607:     {
+ 608:       name: "sofa_fabric_base",
+ 609:       geometryName: "Object_46",
+ 610:       materialName: "meridienne_001___mat_tissus078_bissg",
+ 611:     },
+ 612:     {
+ 613:       name: "rusty_metal",
+ 614:       geometryName: "Object_47",
+ 615:       materialName: "metal_rouille",
+ 616:     },
+ 617:     {
+ 618:       name: "plant_wall_1",
+ 619:       geometryName: "Object_48",
+ 620:       materialName: "mur_vegetal_off___phong150",
+ 621:     },
+ 622:     {
+ 623:       name: "plant_wall_2",
+ 624:       geometryName: "Object_49",
+ 625:       materialName: "mur_vegetal_off___phong151",
+ 626:     },
+ 627:     {
+ 628:       name: "plant_wall_3",
+ 629:       geometryName: "Object_50",
+ 630:       materialName: "mur_vegetal_off___phong30",
+ 631:     },
+ 632:     {
+ 633:       name: "plant_wall_4",
+ 634:       geometryName: "Object_51",
+ 635:       materialName: "mur_vegetal_off___phong31",
+ 636:     },
+ 637:     {
+ 638:       name: "plant_trunk",
+ 639:       geometryName: "Object_65",
+ 640:       materialName: "plante_interieur_off___bis_palmier_tronc2",
+ 641:     },
+ 642:     {
+ 643:       name: "plant_1",
+ 644:       geometryName: "Object_66",
+ 645:       materialName: "plante_interieur_off___phong56",
+ 646:     },
+ 647:     {
+ 648:       name: "plant_2",
+ 649:       geometryName: "Object_67",
+ 650:       materialName: "plante_interieur_off___phong57",
+ 651:     },
+ 652:     {
+ 653:       name: "plant_3",
+ 654:       geometryName: "Object_68",
+ 655:       materialName: "plante_interieur_off___phong80",
+ 656:     },
+ 657:     {
+ 658:       name: "orange_accent",
+ 659:       geometryName: "Object_53",
+ 660:       materialName: "orange_003",
+ 661:     },
+ 662:     {
+ 663:       name: "paper_towel_1",
+ 664:       geometryName: "Object_54",
+ 665:       materialName: "pack_002_sdb_deroule_papier___01___defaulta",
+ 666:     },
+ 667:     {
+ 668:       name: "paper_towel_2",
+ 669:       geometryName: "Object_55",
+ 670:       materialName: "pack_002_sdb_deroule_papier___01___defaulte",
+ 671:     },
+ 672:     {
+ 673:       name: "paper_towel_3",
+ 674:       geometryName: "Object_56",
+ 675:       materialName: "pack_002_sdb_deroule_papier___01___defaultz",
+ 676:     },
+ 677:     {
+ 678:       name: "counter_table",
+ 679:       geometryName: "Object_57",
+ 680:       materialName:
+ 681:         "pack_003_cuisine_001_table___mat_pack_003_cuisine_001_table_tab",
+ 682:     },
+ 683:     {
+ 684:       name: "wall_art",
+ 685:       geometryName: "Object_62",
+ 686:       materialName: "pack_004_salon_002_tableau___enduit1",
+ 687:     },
+ 688:     {
+ 689:       name: "bottles",
+ 690:       geometryName: "Object_63",
+ 691:       materialName: "pack_005_salle_a_manger_armoire___nopaint_bouteilles",
+ 692:     },
+ 693:     {
+ 694:       name: "cabinet_handles",
+ 695:       geometryName: "Object_64",
+ 696:       materialName: "pack_005_salle_a_manger_armoire___poignees",
+ 697:     },
+ 698:     {
+ 699:       name: "door_frame",
+ 700:       geometryName: "Object_69",
+ 701:       materialName: "porte_009___d",
+ 702:     },
+ 703:     {
+ 704:       name: "white_surface",
+ 705:       geometryName: "Object_7",
+ 706:       materialName: "blanc_001",
+ 707:     },
+ 708:     {
+ 709:       name: "door_panel",
+ 710:       geometryName: "Object_70",
+ 711:       materialName: "porte_009___p",
+ 712:     },
+ 713:     {
+ 714:       name: "glass_door",
+ 715:       geometryName: "Object_71",
+ 716:       materialName: "porte_022___mat_vitresg",
+ 717:     },
+ 718:     {
+ 719:       name: "trash_can_metal",
+ 720:       geometryName: "Object_72",
+ 721:       materialName: "poubelle_002___phong1sg",
+ 722:     },
+ 723:     {
+ 724:       name: "trash_can_body",
+ 725:       geometryName: "Object_73",
+ 726:       materialName: "poubelle_002___poubelle",
+ 727:     },
+ 728:     {
+ 729:       name: "digital_signage",
+ 730:       geometryName: "Object_74",
+ 731:       materialName: "s1200_3",
+ 732:     },
+ 733:     {
+ 734:       name: "blue_fabric_static_1",
+ 735:       geometryName: "Object_76",
+ 736:       materialName: "tissus_089",
+ 737:     },
+ 738:     {
+ 739:       name: "blue_fabric_static_2",
+ 740:       geometryName: "Object_77",
+ 741:       materialName: "tissus_089_ovcola0a3cccolpic00contpic03",
+ 742:     },
+ 743:     {
+ 744:       name: "vase_flowers",
+ 745:       geometryName: "Object_79",
+ 746:       materialName: "vase_fleur_off___phong94",
+ 747:     },
+ 748:     {
+ 749:       name: "blue_fabric_1",
+ 750:       geometryName: "Object_8",
+ 751:       materialName: "bleu_002",
+ 752:     },
+ 753:     {
+ 754:       name: "blue_fabric_2",
+ 755:       geometryName: "Object_8001",
+ 756:       materialName: "bleu_002",
+ 757:     },
+ 758:     {
+ 759:       name: "blue_fabric_3",
+ 760:       geometryName: "Object_8002",
+ 761:       materialName: "bleu_002",
+ 762:     },
+ 763:     {
+ 764:       name: "blue_fabric_4",
+ 765:       geometryName: "Object_8003",
+ 766:       materialName: "bleu_002",
+ 767:     },
+ 768:     {
+ 769:       name: "blue_fabric_5",
+ 770:       geometryName: "Object_8008",
+ 771:       materialName: "bleu_002",
+ 772:     },
+ 773:     {
+ 774:       name: "blue_fabric_6",
+ 775:       geometryName: "Object_8009",
+ 776:       materialName: "bleu_002",
+ 777:     },
+ 778:     {
+ 779:       name: "blue_fabric_7",
+ 780:       geometryName: "Object_8010",
+ 781:       materialName: "bleu_002",
+ 782:     },
+ 783:     {
+ 784:       name: "blue_fabric_8",
+ 785:       geometryName: "Object_8011",
+ 786:       materialName: "bleu_002",
+ 787:     },
+ 788:     {
+ 789:       name: "blue_fabric_9",
+ 790:       geometryName: "Object_8012",
+ 791:       materialName: "bleu_002",
+ 792:     },
+ 793:     {
+ 794:       name: "blue_fabric_10",
+ 795:       geometryName: "Object_8013",
+ 796:       materialName: "bleu_002",
+ 797:     },
+ 798:     {
+ 799:       name: "blue_fabric_11",
+ 800:       geometryName: "Object_8014",
+ 801:       materialName: "bleu_002",
+ 802:     },
+ 803:     {
+ 804:       name: "blue_fabric_12",
+ 805:       geometryName: "Object_8015",
+ 806:       materialName: "bleu_002",
+ 807:     },
+ 808:     {
+ 809:       name: "blue_fabric_13",
+ 810:       geometryName: "Object_8016",
+ 811:       materialName: "bleu_002",
+ 812:     },
+ 813:     {
+ 814:       name: "blue_fabric_14",
+ 815:       geometryName: "Object_8017",
+ 816:       materialName: "bleu_002",
+ 817:     },
+ 818:     {
+ 819:       name: "blue_fabric_15",
+ 820:       geometryName: "Object_8018",
+ 821:       materialName: "bleu_002",
+ 822:     },
+ 823:     {
+ 824:       name: "blue_fabric_16",
+ 825:       geometryName: "Object_8019",
+ 826:       materialName: "bleu_002",
+ 827:     },
+ 828:     {
+ 829:       name: "blue_fabric_17",
+ 830:       geometryName: "Object_8020",
+ 831:       materialName: "bleu_002",
+ 832:     },
+ 833:     {
+ 834:       name: "blue_fabric_18",
+ 835:       geometryName: "Object_8021",
+ 836:       materialName: "bleu_002",
+ 837:     },
+ 838:     {
+ 839:       name: "blue_fabric_19",
+ 840:       geometryName: "Object_8022",
+ 841:       materialName: "bleu_002",
+ 842:     },
+ 843:     {
+ 844:       name: "blue_fabric_20",
+ 845:       geometryName: "Object_8023",
+ 846:       materialName: "bleu_002",
+ 847:     },
+ 848:     {
+ 849:       name: "blue_fabric_21",
+ 850:       geometryName: "Object_8024",
+ 851:       materialName: "bleu_002",
+ 852:     },
+ 853:     {
+ 854:       name: "blue_fabric_22",
+ 855:       geometryName: "Object_8025",
+ 856:       materialName: "bleu_002",
+ 857:     },
+ 858:     {
+ 859:       name: "blue_fabric_23",
+ 860:       geometryName: "Object_8026",
+ 861:       materialName: "bleu_002",
+ 862:     },
+ 863:     {
+ 864:       name: "blue_fabric_24",
+ 865:       geometryName: "Object_8027",
+ 866:       materialName: "bleu_002",
+ 867:     },
+ 868:     {
+ 869:       name: "blue_fabric_25",
+ 870:       geometryName: "Object_8028",
+ 871:       materialName: "bleu_002",
+ 872:     },
+ 873:     {
+ 874:       name: "blue_fabric_26",
+ 875:       geometryName: "Object_8029",
+ 876:       materialName: "bleu_002",
+ 877:     },
+ 878:     {
+ 879:       name: "blue_fabric_27",
+ 880:       geometryName: "Object_8030",
+ 881:       materialName: "bleu_002",
+ 882:     },
+ 883:     {
+ 884:       name: "blue_fabric_28",
+ 885:       geometryName: "Object_8031",
+ 886:       materialName: "bleu_002",
+ 887:     },
+ 888:     {
+ 889:       name: "blue_fabric_29",
+ 890:       geometryName: "Object_8032",
+ 891:       materialName: "bleu_002",
+ 892:     },
+ 893:     {
+ 894:       name: "blue_fabric_30",
+ 895:       geometryName: "Object_8033",
+ 896:       materialName: "bleu_002",
+ 897:     },
+ 898:     {
+ 899:       name: "blue_fabric_31",
+ 900:       geometryName: "Object_8038",
+ 901:       materialName: "bleu_002",
+ 902:     },
+ 903:     {
+ 904:       name: "blue_fabric_32",
+ 905:       geometryName: "Object_8039",
+ 906:       materialName: "bleu_002",
+ 907:     },
+ 908:     {
+ 909:       name: "blue_fabric_33",
+ 910:       geometryName: "Object_8040",
+ 911:       materialName: "bleu_002",
+ 912:     },
+ 913:     {
+ 914:       name: "blue_fabric_34",
+ 915:       geometryName: "Object_8041",
+ 916:       materialName: "bleu_002",
+ 917:     },
+ 918:     {
+ 919:       name: "display_case_glass",
+ 920:       geometryName: "Object_80",
+ 921:       materialName: "vitrine_000___mat_vitrine_verre",
+ 922:     },
+ 923:     {
+ 924:       name: "toilet_bowl",
+ 925:       geometryName: "Object_81",
+ 926:       materialName: "wc_004___wc_004_blinn1sg",
+ 927:     },
+ 928:     {
+ 929:       name: "toilet_tank",
+ 930:       geometryName: "Object_82",
+ 931:       materialName: "wc_004___wc_004_blinn3sg",
+ 932:     },
+ 933:     {
+ 934:       name: "wood_slats",
+ 935:       geometryName: "Object_83",
+ 936:       materialName: "ws13d0020",
+ 937:     },
+ 938:     {
+ 939:       name: "beige_element",
+ 940:       geometryName: "Object_84",
+ 941:       materialName: "--_ovcol6b5a2ecolpic06contpic09",
+ 942:     },
+ 943:     {
+ 944:       name: "floor_pattern",
+ 945:       geometryName: "Object_85",
+ 946:       materialName: "-------76810378",
+ 947:     },
+ 948:     {
+ 949:       name: "blue_fabric_alt_1",
+ 950:       geometryName: "Object_9",
+ 951:       materialName: "bleu_004",
+ 952:     },
+ 953:     {
+ 954:       name: "blue_fabric_alt_2",
+ 955:       geometryName: "Object_9001",
+ 956:       materialName: "bleu_004",
+ 957:     },
+ 958:     {
+ 959:       name: "blue_fabric_alt_3",
+ 960:       geometryName: "Object_9002",
+ 961:       materialName: "bleu_004",
+ 962:     },
+ 963:     {
+ 964:       name: "blue_fabric_alt_4",
+ 965:       geometryName: "Object_9003",
+ 966:       materialName: "bleu_004",
+ 967:     },
+ 968:     {
+ 969:       name: "blue_fabric_alt_5",
+ 970:       geometryName: "Object_9004",
+ 971:       materialName: "bleu_004",
+ 972:     },
+ 973:     {
+ 974:       name: "blue_fabric_alt_6",
+ 975:       geometryName: "Object_9005",
+ 976:       materialName: "bleu_004",
+ 977:     },
+ 978:     {
+ 979:       name: "blue_fabric_alt_7",
+ 980:       geometryName: "Object_9006",
+ 981:       materialName: "bleu_004",
+ 982:     },
+ 983:     {
+ 984:       name: "blue_fabric_alt_8",
+ 985:       geometryName: "Object_9007",
+ 986:       materialName: "bleu_004",
+ 987:     },
+ 988:     {
+ 989:       name: "blue_fabric_alt_9",
+ 990:       geometryName: "Object_9008",
+ 991:       materialName: "bleu_004",
+ 992:     },
+ 993:     {
+ 994:       name: "blue_fabric_alt_10",
+ 995:       geometryName: "Object_9009",
+ 996:       materialName: "bleu_004",
+ 997:     },
+ 998:     {
+ 999:       name: "blue_fabric_alt_11",
+1000:       geometryName: "Object_9010",
+1001:       materialName: "bleu_004",
+1002:     },
+1003:     {
+1004:       name: "blue_fabric_alt_12",
+1005:       geometryName: "Object_9011",
+1006:       materialName: "bleu_004",
+1007:     },
+1008:     {
+1009:       name: "blue_fabric_alt_13",
+1010:       geometryName: "Object_9012",
+1011:       materialName: "bleu_004",
+1012:     },
+1013:     {
+1014:       name: "blue_fabric_alt_14",
+1015:       geometryName: "Object_9013",
+1016:       materialName: "bleu_004",
+1017:     },
+1018:     {
+1019:       name: "blue_fabric_alt_15",
+1020:       geometryName: "Object_9014",
+1021:       materialName: "bleu_004",
+1022:     },
+1023:     {
+1024:       name: "blue_fabric_alt_16",
+1025:       geometryName: "Object_9015",
+1026:       materialName: "bleu_004",
+1027:     },
+1028:     {
+1029:       name: "blue_fabric_alt_17",
+1030:       geometryName: "Object_9016",
+1031:       materialName: "bleu_004",
+1032:     },
+1033:     {
+1034:       name: "blue_fabric_alt_18",
+1035:       geometryName: "Object_9017",
+1036:       materialName: "bleu_004",
+1037:     },
+1038:     {
+1039:       name: "blue_fabric_alt_19",
+1040:       geometryName: "Object_9018",
+1041:       materialName: "bleu_004",
+1042:     },
+1043:     {
+1044:       name: "blue_fabric_alt_20",
+1045:       geometryName: "Object_9019",
+1046:       materialName: "bleu_004",
+1047:     },
+1048:     {
+1049:       name: "blue_fabric_alt_21",
+1050:       geometryName: "Object_9020",
+1051:       materialName: "bleu_004",
+1052:     },
+1053:     {
+1054:       name: "blue_fabric_alt_22",
+1055:       geometryName: "Object_9021",
+1056:       materialName: "bleu_004",
+1057:     },
+1058:     {
+1059:       name: "blue_fabric_alt_23",
+1060:       geometryName: "Object_9022",
+1061:       materialName: "bleu_004",
+1062:     },
+1063:     {
+1064:       name: "blue_fabric_alt_24",
+1065:       geometryName: "Object_9023",
+1066:       materialName: "bleu_004",
+1067:     },
+1068:     {
+1069:       name: "blue_fabric_alt_25",
+1070:       geometryName: "Object_9024",
+1071:       materialName: "bleu_004",
+1072:     },
+1073:     {
+1074:       name: "blue_fabric_alt_26",
+1075:       geometryName: "Object_9025",
+1076:       materialName: "bleu_004",
+1077:     },
+1078:     {
+1079:       name: "blue_fabric_alt_27",
+1080:       geometryName: "Object_9026",
+1081:       materialName: "bleu_004",
+1082:     },
+1083:     {
+1084:       name: "blue_fabric_alt_28",
+1085:       geometryName: "Object_9027",
+1086:       materialName: "bleu_004",
+1087:     },
+1088:     {
+1089:       name: "blue_fabric_alt_29",
+1090:       geometryName: "Object_9028",
+1091:       materialName: "bleu_004",
+1092:     },
+1093:     {
+1094:       name: "blue_fabric_alt_30",
+1095:       geometryName: "Object_9029",
+1096:       materialName: "bleu_004",
+1097:     },
+1098:     {
+1099:       name: "blue_fabric_alt_31",
+1100:       geometryName: "Object_9030",
+1101:       materialName: "bleu_004",
+1102:     },
+1103:     {
+1104:       name: "blue_fabric_alt_32",
+1105:       geometryName: "Object_9031",
+1106:       materialName: "bleu_004",
+1107:     },
+1108:     {
+1109:       name: "blue_fabric_alt_33",
+1110:       geometryName: "Object_9032",
+1111:       materialName: "bleu_004",
+1112:     },
+1113:     {
+1114:       name: "blue_fabric_alt_34",
+1115:       geometryName: "Object_9033",
+1116:       materialName: "bleu_004",
+1117:     },
+1118:     {
+1119:       name: "blue_fabric_alt_35",
+1120:       geometryName: "Object_9042",
+1121:       materialName: "bleu_004",
+1122:     },
+1123:     {
+1124:       name: "blue_fabric_alt_36",
+1125:       geometryName: "Object_9043",
+1126:       materialName: "bleu_004",
+1127:     },
+1128:     {
+1129:       name: "blue_fabric_alt_37",
+1130:       geometryName: "Object_9044",
+1131:       materialName: "bleu_004",
+1132:     },
+1133:     {
+1134:       name: "blue_fabric_alt_38",
+1135:       geometryName: "Object_9045",
+1136:       materialName: "bleu_004",
+1137:     },
+1138:     {
+1139:       name: "blue_fabric_alt_39",
+1140:       geometryName: "Object_9046",
+1141:       materialName: "bleu_004",
+1142:     },
+1143:     {
+1144:       name: "blue_fabric_alt_40",
+1145:       geometryName: "Object_9047",
+1146:       materialName: "bleu_004",
+1147:     },
+1148:     {
+1149:       name: "blue_fabric_alt_41",
+1150:       geometryName: "Object_9048",
+1151:       materialName: "bleu_004",
+1152:     },
+1153:     {
+1154:       name: "blue_fabric_alt_42",
+1155:       geometryName: "Object_9049",
+1156:       materialName: "bleu_004",
+1157:     },
+1158:     {
+1159:       name: "blue_fabric_alt_43",
+1160:       geometryName: "Object_9054",
+1161:       materialName: "bleu_004",
+1162:     },
+1163:     {
+1164:       name: "blue_fabric_alt_44",
+1165:       geometryName: "Object_9055",
+1166:       materialName: "bleu_004",
+1167:     },
+1168:   ],
+1169: });
+
+================
+File: src/configs/KitchenModelConfig.js
+================
+  1: import { RestaurantModelConfig } from "./ModelConfig.js";
+  2: export const kitchenModelConfig = new RestaurantModelConfig({
+  3:   modelPath: "/kitchen.glb",
+  4:   selectableItems: [
+  5:     {
+  6:       type: "chair",
+  7:       id: "CHAIR1",
+  8:       geometries: [
+  9:         {
+ 10:           geometryName: "chairs001_1",
+ 11:           materialName: "walls",
+ 12:         },
+ 13:         {
+ 14:           geometryName: "chairs001_2",
+ 15:           materialName: "plastic",
+ 16:         },
+ 17:       ],
+ 18:     },
+ 19:     {
+ 20:       type: "chair",
+ 21:       id: "CHAIR2",
+ 22:       geometries: [
+ 23:         {
+ 24:           geometryName: "chairs002_1",
+ 25:           materialName: "walls",
+ 26:         },
+ 27:         {
+ 28:           geometryName: "chairs002_2",
+ 29:           materialName: "plastic",
+ 30:         },
+ 31:       ],
+ 32:     },
+ 33:     {
+ 34:       type: "chair",
+ 35:       id: "CHAIR3",
+ 36:       geometries: [
+ 37:         {
+ 38:           geometryName: "chairs003_1",
+ 39:           materialName: "walls",
+ 40:         },
+ 41:         {
+ 42:           geometryName: "chairs003_2",
+ 43:           materialName: "plastic",
+ 44:         },
+ 45:       ],
+ 46:     },
+ 47:     {
+ 48:       type: "chair",
+ 49:       id: "CHAIR4",
+ 50:       geometries: [
+ 51:         {
+ 52:           geometryName: "chairs004_1",
+ 53:           materialName: "walls",
+ 54:         },
+ 55:         {
+ 56:           geometryName: "chairs004_2",
+ 57:           materialName: "plastic",
+ 58:         },
+ 59:       ],
+ 60:     },
+ 61:     {
+ 62:       type: "chair",
+ 63:       id: "CHAIR5",
+ 64:       geometries: [
+ 65:         {
+ 66:           geometryName: "chairs005_1",
+ 67:           materialName: "walls",
+ 68:         },
+ 69:         {
+ 70:           geometryName: "chairs005_2",
+ 71:           materialName: "plastic",
+ 72:         },
+ 73:       ],
+ 74:     },
+ 75:     {
+ 76:       type: "chair",
+ 77:       id: "CHAIR6",
+ 78:       geometries: [
+ 79:         {
+ 80:           geometryName: "chairs006_1",
+ 81:           materialName: "walls",
+ 82:         },
+ 83:         {
+ 84:           geometryName: "chairs006_2",
+ 85:           materialName: "plastic",
+ 86:         },
+ 87:       ],
+ 88:     },
+ 89:   ],
+ 90:   staticItems: [
+ 91:     { name: "vase1", geometryName: "vase1", materialName: "gray" },
+ 92:     { name: "bottle", geometryName: "bottle", materialName: "gray" },
+ 93:     { name: "walls", geometryName: "walls_1", materialName: "floor" },
+ 94:     {
+ 95:       name: "plant_leaves",
+ 96:       geometryName: "plant_1",
+ 97:       materialName: "potted_plant_01_leaves",
+ 98:     },
+ 99:     {
+100:       name: "plant_pot",
+101:       geometryName: "plant_2",
+102:       materialName: "potted_plant_01_pot",
+103:     },
+104:     {
+105:       name: "cuttingboard",
+106:       geometryName: "cuttingboard",
+107:       materialName: "walls",
+108:     },
+109:     { name: "bowl", geometryName: "bowl", materialName: "walls" },
+110:     { name: "carpet", geometryName: "carpet", materialName: "carpet" },
+111:     { name: "table", geometryName: "table", materialName: "walls" },
+112:     { name: "vase", geometryName: "vase", materialName: "gray" },
+113:     { name: "kitchen", geometryName: "kitchen", materialName: "walls" },
+114:     { name: "sink", geometryName: "sink", materialName: "chrome" },
+115:   ],
+116: });
 
 ================
 File: src/configs/ModelConfig.js
 ================
-  1: import * as THREE from "three";
-  2: export class RestaurantModelConfig {
-  3:   constructor({
-  4:     modelPath,
-  5:     initialCameraPosition = [0, 10, 0],
-  6:     cameraFov = 40,
-  7:     selectableItems = [],
-  8:     staticItems = [],
-  9:     selectionColor = new THREE.Color(0x00ff00),
- 10:     occupiedColor = new THREE.Color(0xff0000),
- 11:     emissiveIntensity = 0.5,
- 12:     animationSpeed = 2,
- 13:     animationScale = 0.05,
- 14:   }) {
- 15:     this.modelPath = modelPath;
- 16:     this.initialCameraPosition = initialCameraPosition;
- 17:     this.cameraFov = cameraFov;
- 18:     this.selectableItems = selectableItems;
- 19:     this.staticItems = staticItems;
- 20:     this.selectionColor = selectionColor;
- 21:     this.occupiedColor = occupiedColor;
- 22:     this.emissiveIntensity = emissiveIntensity;
- 23:     this.animationSpeed = animationSpeed;
- 24:     this.animationScale = animationScale;
- 25:   }
- 26:   createEmissiveMaterial(baseMaterial, emissiveColor) {
- 27:     return new THREE.MeshStandardMaterial({
- 28:       ...baseMaterial,
- 29:       emissive: emissiveColor,
- 30:       emissiveIntensity: this.emissiveIntensity,
- 31:     });
- 32:   }
- 33: }
- 34: export const kitchenModelConfig = new RestaurantModelConfig({
- 35:   modelPath: "/kitchen.glb",
- 36:   selectableItems: [
- 37:     {
- 38:       type: "chair",
- 39:       id: "CHAIR1",
- 40:       outerGeometryName: "chairs001_1",
- 41:       innerGeometryName: "chairs001_2",
- 42:       outerMaterialName: "walls",
- 43:       innerMaterialName: "plastic",
- 44:     },
- 45:     {
- 46:       type: "chair",
- 47:       id: "CHAIR2",
- 48:       outerGeometryName: "chairs002_1",
- 49:       innerGeometryName: "chairs002_2",
- 50:       outerMaterialName: "walls",
- 51:       innerMaterialName: "plastic",
- 52:     },
- 53:     {
- 54:       type: "chair",
- 55:       id: "CHAIR3",
- 56:       outerGeometryName: "chairs003_1",
- 57:       innerGeometryName: "chairs003_2",
- 58:       outerMaterialName: "walls",
- 59:       innerMaterialName: "plastic",
- 60:     },
- 61:     {
- 62:       type: "chair",
- 63:       id: "CHAIR4",
- 64:       outerGeometryName: "chairs004_1",
- 65:       innerGeometryName: "chairs004_2",
- 66:       outerMaterialName: "walls",
- 67:       innerMaterialName: "plastic",
- 68:     },
- 69:     {
- 70:       type: "chair",
- 71:       id: "CHAIR5",
- 72:       outerGeometryName: "chairs005_1",
- 73:       innerGeometryName: "chairs005_2",
- 74:       outerMaterialName: "walls",
- 75:       innerMaterialName: "plastic",
- 76:     },
- 77:     {
- 78:       type: "chair",
- 79:       id: "CHAIR6",
- 80:       outerGeometryName: "chairs006_1",
- 81:       innerGeometryName: "chairs006_2",
- 82:       outerMaterialName: "walls",
- 83:       innerMaterialName: "plastic",
- 84:     },
- 85:   ],
- 86:   staticItems: [
- 87:     { name: "vase1", geometryName: "vase1", materialName: "gray" },
- 88:     { name: "bottle", geometryName: "bottle", materialName: "gray" },
- 89:     { name: "walls", geometryName: "walls_1", materialName: "floor" },
- 90:     {
- 91:       name: "plant_leaves",
- 92:       geometryName: "plant_1",
- 93:       materialName: "potted_plant_01_leaves",
- 94:     },
- 95:     {
- 96:       name: "plant_pot",
- 97:       geometryName: "plant_2",
- 98:       materialName: "potted_plant_01_pot",
- 99:     },
-100:     {
-101:       name: "cuttingboard",
-102:       geometryName: "cuttingboard",
-103:       materialName: "walls",
-104:     },
-105:     { name: "bowl", geometryName: "bowl", materialName: "walls" },
-106:     { name: "carpet", geometryName: "carpet", materialName: "carpet" },
-107:     { name: "table", geometryName: "table", materialName: "walls" },
-108:     { name: "vase", geometryName: "vase", materialName: "gray" },
-109:     { name: "kitchen", geometryName: "kitchen", materialName: "walls" },
-110:     { name: "sink", geometryName: "sink", materialName: "chrome" },
-111:   ],
-112: });
-113: export const modernRestaurantConfig = new RestaurantModelConfig({
-114:   modelPath: "/modern-restaurant.glb",
-115:   initialCameraPosition: [0, 8, 5],
-116:   cameraFov: 45,
-117:   selectableItems: [
-118:     {
-119:       type: "chair",
-120:       id: "TABLE1_CHAIR1",
-121:       outerGeometryName: "chair_1_outer",
-122:       innerGeometryName: "chair_1_inner",
-123:       outerMaterialName: "chair_material",
-124:       innerMaterialName: "cushion_material",
-125:     },
-126:   ],
-127:   staticItems: [
-128:   ],
-129:   selectionColor: new THREE.Color(0x2196f3),
-130:   occupiedColor: new THREE.Color(0xff5252),
-131: });
-132: export const modelRegistry = {
-133:   kitchen: kitchenModelConfig,
-134:   modernRestaurant: modernRestaurantConfig,
-135: };
+ 1: import * as THREE from "three";
+ 2: export class RestaurantModelConfig {
+ 3:   constructor({
+ 4:     modelPath,
+ 5:     initialCameraPosition = [0, 10, 0],
+ 6:     cameraFov = 40,
+ 7:     cameraTarget = [0, 0, 0],
+ 8:     selectableItems = [],
+ 9:     staticItems = [],
+10:     selectionColor = new THREE.Color(0x00ff00),
+11:     occupiedColor = new THREE.Color(0xff0000),
+12:     emissiveIntensity = 0.5,
+13:     animationSpeed = 8,
+14:     animationScale = 0.05,
+15:   }) {
+16:     this.modelPath = modelPath;
+17:     this.initialCameraPosition = initialCameraPosition;
+18:     this.cameraFov = cameraFov;
+19:     this.cameraTarget = cameraTarget;
+20:     this.selectableItems = selectableItems;
+21:     this.staticItems = staticItems;
+22:     this.selectionColor = selectionColor;
+23:     this.occupiedColor = occupiedColor;
+24:     this.emissiveIntensity = emissiveIntensity;
+25:     this.animationSpeed = animationSpeed;
+26:     this.animationScale = animationScale;
+27:   }
+28:   createEmissiveMaterial(baseMaterial, emissiveColor) {
+29:     if (!baseMaterial) return null;
+30:     const clonedMaterial = baseMaterial.clone();
+31:     clonedMaterial.emissive = emissiveColor;
+32:     clonedMaterial.emissiveIntensity = this.emissiveIntensity;
+33:     clonedMaterial.toneMapped = false;
+34:     return clonedMaterial;
+35:   }
+36: }
+
+================
+File: src/configs/ModelConfigForCafe.js
+================
+   1: import React, { useRef } from 'react'
+   2: import { useGLTF } from '@react-three/drei'
+   3: export function Model(props) {
+   4:   const { nodes, materials } = useGLTF('/cafe.glb')
+   5:   return (
+   6:     <group {...props} dispose={null}>
+   7:       <group rotation={[-Math.PI / 2, 0, 0]}>
+   8:         <mesh
+   9:           castShadow
+  10:           receiveShadow
+  11:           geometry={nodes.Object_11.geometry}
+  12:           material={materials.bois_046}
+  13:         />
+  14:         <mesh
+  15:           castShadow
+  16:           receiveShadow
+  17:           geometry={nodes.Object_11001.geometry}
+  18:           material={materials.bois_046}
+  19:         />
+  20:         <mesh
+  21:           castShadow
+  22:           receiveShadow
+  23:           geometry={nodes.Object_11002.geometry}
+  24:           material={materials.bois_046}
+  25:         />
+  26:         <mesh
+  27:           castShadow
+  28:           receiveShadow
+  29:           geometry={nodes.Object_11003.geometry}
+  30:           material={materials.bois_046}
+  31:         />
+  32:         <mesh
+  33:           castShadow
+  34:           receiveShadow
+  35:           geometry={nodes.Object_11004.geometry}
+  36:           material={materials.bois_046}
+  37:         />
+  38:         <mesh
+  39:           castShadow
+  40:           receiveShadow
+  41:           geometry={nodes.Object_11005.geometry}
+  42:           material={materials.bois_046}
+  43:         />
+  44:         <mesh
+  45:           castShadow
+  46:           receiveShadow
+  47:           geometry={nodes.Object_11006.geometry}
+  48:           material={materials.bois_046}
+  49:         />
+  50:         <mesh
+  51:           castShadow
+  52:           receiveShadow
+  53:           geometry={nodes.Object_11007.geometry}
+  54:           material={materials.bois_046}
+  55:         />
+  56:         <mesh
+  57:           castShadow
+  58:           receiveShadow
+  59:           geometry={nodes.Object_11008.geometry}
+  60:           material={materials.bois_046}
+  61:         />
+  62:         <mesh
+  63:           castShadow
+  64:           receiveShadow
+  65:           geometry={nodes.Object_11009.geometry}
+  66:           material={materials.bois_046}
+  67:         />
+  68:         <mesh
+  69:           castShadow
+  70:           receiveShadow
+  71:           geometry={nodes.Object_11010.geometry}
+  72:           material={materials.bois_046}
+  73:         />
+  74:         <mesh
+  75:           castShadow
+  76:           receiveShadow
+  77:           geometry={nodes.Object_11011.geometry}
+  78:           material={materials.bois_046}
+  79:         />
+  80:         <mesh
+  81:           castShadow
+  82:           receiveShadow
+  83:           geometry={nodes.Object_11012.geometry}
+  84:           material={materials.bois_046}
+  85:         />
+  86:         <mesh
+  87:           castShadow
+  88:           receiveShadow
+  89:           geometry={nodes.Object_11013.geometry}
+  90:           material={materials.bois_046}
+  91:         />
+  92:         <mesh
+  93:           castShadow
+  94:           receiveShadow
+  95:           geometry={nodes.Object_11014.geometry}
+  96:           material={materials.bois_046}
+  97:         />
+  98:         <mesh
+  99:           castShadow
+ 100:           receiveShadow
+ 101:           geometry={nodes.Object_11015.geometry}
+ 102:           material={materials.bois_046}
+ 103:         />
+ 104:         <mesh
+ 105:           castShadow
+ 106:           receiveShadow
+ 107:           geometry={nodes.Object_11016.geometry}
+ 108:           material={materials.bois_046}
+ 109:         />
+ 110:         <mesh
+ 111:           castShadow
+ 112:           receiveShadow
+ 113:           geometry={nodes.Object_11017.geometry}
+ 114:           material={materials.bois_046}
+ 115:         />
+ 116:         <mesh
+ 117:           castShadow
+ 118:           receiveShadow
+ 119:           geometry={nodes.Object_11018.geometry}
+ 120:           material={materials.bois_046}
+ 121:         />
+ 122:         <mesh
+ 123:           castShadow
+ 124:           receiveShadow
+ 125:           geometry={nodes.Object_11019.geometry}
+ 126:           material={materials.bois_046}
+ 127:         />
+ 128:         <mesh
+ 129:           castShadow
+ 130:           receiveShadow
+ 131:           geometry={nodes.Object_11020.geometry}
+ 132:           material={materials.bois_046}
+ 133:         />
+ 134:         <mesh
+ 135:           castShadow
+ 136:           receiveShadow
+ 137:           geometry={nodes.Object_11021.geometry}
+ 138:           material={materials.bois_046}
+ 139:         />
+ 140:         <mesh
+ 141:           castShadow
+ 142:           receiveShadow
+ 143:           geometry={nodes.Object_11022.geometry}
+ 144:           material={materials.bois_046}
+ 145:         />
+ 146:         <mesh
+ 147:           castShadow
+ 148:           receiveShadow
+ 149:           geometry={nodes.Object_11023.geometry}
+ 150:           material={materials.bois_046}
+ 151:         />
+ 152:         <mesh
+ 153:           castShadow
+ 154:           receiveShadow
+ 155:           geometry={nodes.Object_12.geometry}
+ 156:           material={materials.bois_054}
+ 157:         />
+ 158:         <mesh
+ 159:           castShadow
+ 160:           receiveShadow
+ 161:           geometry={nodes.Object_13.geometry}
+ 162:           material={materials.bois_055}
+ 163:         />
+ 164:         <mesh
+ 165:           castShadow
+ 166:           receiveShadow
+ 167:           geometry={nodes.Object_14.geometry}
+ 168:           material={materials.bois_089_Room_Entity_Material}
+ 169:         />
+ 170:         <mesh
+ 171:           castShadow
+ 172:           receiveShadow
+ 173:           geometry={nodes.Object_15.geometry}
+ 174:           material={materials.bois_110_Room_Entity_Material}
+ 175:         />
+ 176:         <mesh
+ 177:           castShadow
+ 178:           receiveShadow
+ 179:           geometry={nodes.Object_16.geometry}
+ 180:           material={materials.d671effe7f2cd3fb8e0c119e09825243}
+ 181:         />
+ 182:         <mesh
+ 183:           castShadow
+ 184:           receiveShadow
+ 185:           geometry={nodes.Object_17.geometry}
+ 186:           material={materials.eames_chair_dining_2____eames_chair_dinning_bmetal}
+ 187:         />
+ 188:         <mesh
+ 189:           castShadow
+ 190:           receiveShadow
+ 191:           geometry={nodes.Object_18.geometry}
+ 192:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+ 193:         />
+ 194:         <mesh
+ 195:           castShadow
+ 196:           receiveShadow
+ 197:           geometry={nodes.Object_19.geometry}
+ 198:           material={materials.enduit_004_Room_Entity_Material}
+ 199:         />
+ 200:         <mesh
+ 201:           castShadow
+ 202:           receiveShadow
+ 203:           geometry={nodes.Object_2.geometry}
+ 204:           material={materials['700-nw_ovcol81592bcolpic05contpic10']}
+ 205:         />
+ 206:         <mesh
+ 207:           castShadow
+ 208:           receiveShadow
+ 209:           geometry={nodes.Object_20.geometry}
+ 210:           material={materials.enduit_004_Wall_Entity_Material}
+ 211:         />
+ 212:         <mesh
+ 213:           castShadow
+ 214:           receiveShadow
+ 215:           geometry={nodes.Object_21.geometry}
+ 216:           material={materials.faience_041_ovcol999999colpic12contpic01_Room_Entity_Material}
+ 217:         />
+ 218:         <mesh
+ 219:           castShadow
+ 220:           receiveShadow
+ 221:           geometry={nodes.Object_22.geometry}
+ 222:           material={materials.gris_004}
+ 223:         />
+ 224:         <mesh
+ 225:           castShadow
+ 226:           receiveShadow
+ 227:           geometry={nodes.Object_23.geometry}
+ 228:           material={materials.gris_004_Wall_Entity_Material}
+ 229:         />
+ 230:         <mesh
+ 231:           castShadow
+ 232:           receiveShadow
+ 233:           geometry={nodes.Object_24.geometry}
+ 234:           material={materials.hotte_001___material__177}
+ 235:         />
+ 236:         <mesh
+ 237:           castShadow
+ 238:           receiveShadow
+ 239:           geometry={nodes.Object_25.geometry}
+ 240:           material={materials.hotte_001___material__178}
+ 241:         />
+ 242:         <mesh
+ 243:           castShadow
+ 244:           receiveShadow
+ 245:           geometry={nodes.Object_26.geometry}
+ 246:           material={materials.hotte_001___material__179}
+ 247:         />
+ 248:         <mesh
+ 249:           castShadow
+ 250:           receiveShadow
+ 251:           geometry={nodes.Object_27.geometry}
+ 252:           material={materials['kisspng-pizza-knight-italian-cuisine-vegetarian-cuisine-fo-food']}
+ 253:         />
+ 254:         <mesh
+ 255:           castShadow
+ 256:           receiveShadow
+ 257:           geometry={nodes.Object_28.geometry}
+ 258:           material={materials.kitchen_classic_style_base_cabinet_007___phong2sg}
+ 259:         />
+ 260:         <mesh
+ 261:           castShadow
+ 262:           receiveShadow
+ 263:           geometry={nodes.Object_29.geometry}
+ 264:           material={materials.kitchen_classic_style_base_cabinet_007___phong8sg}
+ 265:         />
+ 266:         <mesh
+ 267:           castShadow
+ 268:           receiveShadow
+ 269:           geometry={nodes.Object_3.geometry}
+ 270:           material={materials.beige_004}
+ 271:         />
+ 272:         <mesh
+ 273:           castShadow
+ 274:           receiveShadow
+ 275:           geometry={nodes.Object_30.geometry}
+ 276:           material={materials.kitchen_classic_style_base_corner_001___phong2sg}
+ 277:         />
+ 278:         <mesh
+ 279:           castShadow
+ 280:           receiveShadow
+ 281:           geometry={nodes.Object_31.geometry}
+ 282:           material={materials.kitchen_classic_style_base_corner_001___phong8sg}
+ 283:         />
+ 284:         <mesh
+ 285:           castShadow
+ 286:           receiveShadow
+ 287:           geometry={nodes.Object_32.geometry}
+ 288:           material={materials.kitchen_classic_style_dishwasher_000___phong5sg}
+ 289:         />
+ 290:         <mesh
+ 291:           castShadow
+ 292:           receiveShadow
+ 293:           geometry={nodes.Object_33.geometry}
+ 294:           material={materials.kitchen_classic_style_dishwasher_000___phong8sg}
+ 295:         />
+ 296:         <mesh
+ 297:           castShadow
+ 298:           receiveShadow
+ 299:           geometry={nodes.Object_34.geometry}
+ 300:           material={materials.kitchen_classic_style_dishwasher_000___phong9sg}
+ 301:         />
+ 302:         <mesh
+ 303:           castShadow
+ 304:           receiveShadow
+ 305:           geometry={nodes.Object_35.geometry}
+ 306:           material={materials.kitchen_classic_style_double_oven_000___phong4sg}
+ 307:         />
+ 308:         <mesh
+ 309:           castShadow
+ 310:           receiveShadow
+ 311:           geometry={nodes.Object_36.geometry}
+ 312:           material={materials.kitchen_classic_style_double_oven_000___phong5sg}
+ 313:         />
+ 314:         <mesh
+ 315:           castShadow
+ 316:           receiveShadow
+ 317:           geometry={nodes.Object_37.geometry}
+ 318:           material={materials.kitchen_classic_style_double_oven_000___phong6sg}
+ 319:         />
+ 320:         <mesh
+ 321:           castShadow
+ 322:           receiveShadow
+ 323:           geometry={nodes.Object_38.geometry}
+ 324:           material={materials.kitchen_classic_style_double_oven_000___phong7sg}
+ 325:         />
+ 326:         <mesh
+ 327:           castShadow
+ 328:           receiveShadow
+ 329:           geometry={nodes.Object_39.geometry}
+ 330:           material={materials.kitchen_classic_style_double_oven_000___vitre}
+ 331:         />
+ 332:         <mesh
+ 333:           castShadow
+ 334:           receiveShadow
+ 335:           geometry={nodes.Object_4.geometry}
+ 336:           material={materials.beige_004_Wall_Entity_Material}
+ 337:         />
+ 338:         <mesh
+ 339:           castShadow
+ 340:           receiveShadow
+ 341:           geometry={nodes.Object_40.geometry}
+ 342:           material={materials.lambris_ext_003}
+ 343:         />
+ 344:         <mesh
+ 345:           castShadow
+ 346:           receiveShadow
+ 347:           geometry={nodes.Object_41.geometry}
+ 348:           material={materials.lambris_ext_004}
+ 349:         />
+ 350:         <mesh
+ 351:           castShadow
+ 352:           receiveShadow
+ 353:           geometry={nodes.Object_42.geometry}
+ 354:           material={materials.lavabo_004___lambert3sg}
+ 355:         />
+ 356:         <mesh
+ 357:           castShadow
+ 358:           receiveShadow
+ 359:           geometry={nodes.Object_43.geometry}
+ 360:           material={materials.lavabo_004___phong1sg}
+ 361:         />
+ 362:         <mesh
+ 363:           castShadow
+ 364:           receiveShadow
+ 365:           geometry={nodes.Object_44.geometry}
+ 366:           material={materials.makaroniiztverdixsortovpshenitsikakievib_7ff8e298}
+ 367:         />
+ 368:         <mesh
+ 369:           castShadow
+ 370:           receiveShadow
+ 371:           geometry={nodes.Object_45.geometry}
+ 372:           material={materials.meridienne_001___bis_mat_metalbasique004sg}
+ 373:         />
+ 374:         <mesh
+ 375:           castShadow
+ 376:           receiveShadow
+ 377:           geometry={nodes.Object_46.geometry}
+ 378:           material={materials.meridienne_001___mat_tissus078_bissg}
+ 379:         />
+ 380:         <mesh
+ 381:           castShadow
+ 382:           receiveShadow
+ 383:           geometry={nodes.Object_47.geometry}
+ 384:           material={materials.metal_rouille}
+ 385:         />
+ 386:         <mesh
+ 387:           castShadow
+ 388:           receiveShadow
+ 389:           geometry={nodes.Object_48.geometry}
+ 390:           material={materials.mur_vegetal_off___phong150}
+ 391:         />
+ 392:         <mesh
+ 393:           castShadow
+ 394:           receiveShadow
+ 395:           geometry={nodes.Object_49.geometry}
+ 396:           material={materials.mur_vegetal_off___phong151}
+ 397:         />
+ 398:         <mesh
+ 399:           castShadow
+ 400:           receiveShadow
+ 401:           geometry={nodes.Object_5.geometry}
+ 402:           material={materials.beige_005_Wall_Entity_Material}
+ 403:         />
+ 404:         <mesh
+ 405:           castShadow
+ 406:           receiveShadow
+ 407:           geometry={nodes.Object_50.geometry}
+ 408:           material={materials.mur_vegetal_off___phong30}
+ 409:         />
+ 410:         <mesh
+ 411:           castShadow
+ 412:           receiveShadow
+ 413:           geometry={nodes.Object_51.geometry}
+ 414:           material={materials.mur_vegetal_off___phong31}
+ 415:         />
+ 416:         <mesh
+ 417:           castShadow
+ 418:           receiveShadow
+ 419:           geometry={nodes.Object_52.geometry}
+ 420:           material={materials.ocre_001_Wall_Entity_Material}
+ 421:         />
+ 422:         <mesh
+ 423:           castShadow
+ 424:           receiveShadow
+ 425:           geometry={nodes.Object_53.geometry}
+ 426:           material={materials.orange_003}
+ 427:         />
+ 428:         <mesh
+ 429:           castShadow
+ 430:           receiveShadow
+ 431:           geometry={nodes.Object_54.geometry}
+ 432:           material={materials.pack_002_sdb_deroule_papier___01___defaulta}
+ 433:         />
+ 434:         <mesh
+ 435:           castShadow
+ 436:           receiveShadow
+ 437:           geometry={nodes.Object_55.geometry}
+ 438:           material={materials.pack_002_sdb_deroule_papier___01___defaulte}
+ 439:         />
+ 440:         <mesh
+ 441:           castShadow
+ 442:           receiveShadow
+ 443:           geometry={nodes.Object_56.geometry}
+ 444:           material={materials.pack_002_sdb_deroule_papier___01___defaultz}
+ 445:         />
+ 446:         <mesh
+ 447:           castShadow
+ 448:           receiveShadow
+ 449:           geometry={nodes.Object_57.geometry}
+ 450:           material={materials.pack_003_cuisine_001_table___mat_pack_003_cuisine_001_table_tab}
+ 451:         />
+ 452:         <mesh
+ 453:           castShadow
+ 454:           receiveShadow
+ 455:           geometry={nodes.Object_6.geometry}
+ 456:           material={materials.beige_006_Wall_Entity_Material}
+ 457:         />
+ 458:         <mesh
+ 459:           castShadow
+ 460:           receiveShadow
+ 461:           geometry={nodes.Object_62.geometry}
+ 462:           material={materials.pack_004_salon_002_tableau___enduit1}
+ 463:         />
+ 464:         <mesh
+ 465:           castShadow
+ 466:           receiveShadow
+ 467:           geometry={nodes.Object_63.geometry}
+ 468:           material={materials.pack_005_salle_a_manger_armoire___nopaint_bouteilles}
+ 469:         />
+ 470:         <mesh
+ 471:           castShadow
+ 472:           receiveShadow
+ 473:           geometry={nodes.Object_64.geometry}
+ 474:           material={materials.pack_005_salle_a_manger_armoire___poignees}
+ 475:         />
+ 476:         <mesh
+ 477:           castShadow
+ 478:           receiveShadow
+ 479:           geometry={nodes.Object_65.geometry}
+ 480:           material={materials.plante_interieur_off___bis_palmier_tronc2}
+ 481:         />
+ 482:         <mesh
+ 483:           castShadow
+ 484:           receiveShadow
+ 485:           geometry={nodes.Object_66.geometry}
+ 486:           material={materials.plante_interieur_off___phong56}
+ 487:         />
+ 488:         <mesh
+ 489:           castShadow
+ 490:           receiveShadow
+ 491:           geometry={nodes.Object_67.geometry}
+ 492:           material={materials.plante_interieur_off___phong57}
+ 493:         />
+ 494:         <mesh
+ 495:           castShadow
+ 496:           receiveShadow
+ 497:           geometry={nodes.Object_68.geometry}
+ 498:           material={materials.plante_interieur_off___phong80}
+ 499:         />
+ 500:         <mesh
+ 501:           castShadow
+ 502:           receiveShadow
+ 503:           geometry={nodes.Object_69.geometry}
+ 504:           material={materials.porte_009___d}
+ 505:         />
+ 506:         <mesh
+ 507:           castShadow
+ 508:           receiveShadow
+ 509:           geometry={nodes.Object_7.geometry}
+ 510:           material={materials.blanc_001}
+ 511:         />
+ 512:         <mesh
+ 513:           castShadow
+ 514:           receiveShadow
+ 515:           geometry={nodes.Object_70.geometry}
+ 516:           material={materials.porte_009___p}
+ 517:         />
+ 518:         <mesh
+ 519:           castShadow
+ 520:           receiveShadow
+ 521:           geometry={nodes.Object_71.geometry}
+ 522:           material={materials.porte_022___mat_vitresg}
+ 523:         />
+ 524:         <mesh
+ 525:           castShadow
+ 526:           receiveShadow
+ 527:           geometry={nodes.Object_72.geometry}
+ 528:           material={materials.poubelle_002___phong1sg}
+ 529:         />
+ 530:         <mesh
+ 531:           castShadow
+ 532:           receiveShadow
+ 533:           geometry={nodes.Object_73.geometry}
+ 534:           material={materials.poubelle_002___poubelle}
+ 535:         />
+ 536:         <mesh
+ 537:           castShadow
+ 538:           receiveShadow
+ 539:           geometry={nodes.Object_74.geometry}
+ 540:           material={materials.s1200_3}
+ 541:         />
+ 542:         <mesh
+ 543:           castShadow
+ 544:           receiveShadow
+ 545:           geometry={nodes.Object_76.geometry}
+ 546:           material={materials.tissus_089}
+ 547:         />
+ 548:         <mesh
+ 549:           castShadow
+ 550:           receiveShadow
+ 551:           geometry={nodes.Object_77.geometry}
+ 552:           material={materials.tissus_089_ovcola0a3cccolpic00contpic03}
+ 553:         />
+ 554:         <mesh
+ 555:           castShadow
+ 556:           receiveShadow
+ 557:           geometry={nodes.Object_79.geometry}
+ 558:           material={materials.vase_fleur_off___phong94}
+ 559:         />
+ 560:         <mesh
+ 561:           castShadow
+ 562:           receiveShadow
+ 563:           geometry={nodes.Object_8.geometry}
+ 564:           material={materials.bleu_002}
+ 565:         />
+ 566:         <mesh
+ 567:           castShadow
+ 568:           receiveShadow
+ 569:           geometry={nodes.Object_8001.geometry}
+ 570:           material={materials.bleu_002}
+ 571:         />
+ 572:         <mesh
+ 573:           castShadow
+ 574:           receiveShadow
+ 575:           geometry={nodes.Object_8002.geometry}
+ 576:           material={materials.bleu_002}
+ 577:         />
+ 578:         <mesh
+ 579:           castShadow
+ 580:           receiveShadow
+ 581:           geometry={nodes.Object_8003.geometry}
+ 582:           material={materials.bleu_002}
+ 583:         />
+ 584:         <mesh
+ 585:           castShadow
+ 586:           receiveShadow
+ 587:           geometry={nodes.Object_8008.geometry}
+ 588:           material={materials.bleu_002}
+ 589:         />
+ 590:         <mesh
+ 591:           castShadow
+ 592:           receiveShadow
+ 593:           geometry={nodes.Object_8009.geometry}
+ 594:           material={materials.bleu_002}
+ 595:         />
+ 596:         <mesh
+ 597:           castShadow
+ 598:           receiveShadow
+ 599:           geometry={nodes.Object_8010.geometry}
+ 600:           material={materials.bleu_002}
+ 601:         />
+ 602:         <mesh
+ 603:           castShadow
+ 604:           receiveShadow
+ 605:           geometry={nodes.Object_8011.geometry}
+ 606:           material={materials.bleu_002}
+ 607:         />
+ 608:         <mesh
+ 609:           castShadow
+ 610:           receiveShadow
+ 611:           geometry={nodes.Object_8012.geometry}
+ 612:           material={materials.bleu_002}
+ 613:         />
+ 614:         <mesh
+ 615:           castShadow
+ 616:           receiveShadow
+ 617:           geometry={nodes.Object_8013.geometry}
+ 618:           material={materials.bleu_002}
+ 619:         />
+ 620:         <mesh
+ 621:           castShadow
+ 622:           receiveShadow
+ 623:           geometry={nodes.Object_8014.geometry}
+ 624:           material={materials.bleu_002}
+ 625:         />
+ 626:         <mesh
+ 627:           castShadow
+ 628:           receiveShadow
+ 629:           geometry={nodes.Object_8015.geometry}
+ 630:           material={materials.bleu_002}
+ 631:         />
+ 632:         <mesh
+ 633:           castShadow
+ 634:           receiveShadow
+ 635:           geometry={nodes.Object_8016.geometry}
+ 636:           material={materials.bleu_002}
+ 637:         />
+ 638:         <mesh
+ 639:           castShadow
+ 640:           receiveShadow
+ 641:           geometry={nodes.Object_8017.geometry}
+ 642:           material={materials.bleu_002}
+ 643:         />
+ 644:         <mesh
+ 645:           castShadow
+ 646:           receiveShadow
+ 647:           geometry={nodes.Object_8018.geometry}
+ 648:           material={materials.bleu_002}
+ 649:         />
+ 650:         <mesh
+ 651:           castShadow
+ 652:           receiveShadow
+ 653:           geometry={nodes.Object_8019.geometry}
+ 654:           material={materials.bleu_002}
+ 655:         />
+ 656:         <mesh
+ 657:           castShadow
+ 658:           receiveShadow
+ 659:           geometry={nodes.Object_8020.geometry}
+ 660:           material={materials.bleu_002}
+ 661:         />
+ 662:         <mesh
+ 663:           castShadow
+ 664:           receiveShadow
+ 665:           geometry={nodes.Object_8021.geometry}
+ 666:           material={materials.bleu_002}
+ 667:         />
+ 668:         <mesh
+ 669:           castShadow
+ 670:           receiveShadow
+ 671:           geometry={nodes.Object_8022.geometry}
+ 672:           material={materials.bleu_002}
+ 673:         />
+ 674:         <mesh
+ 675:           castShadow
+ 676:           receiveShadow
+ 677:           geometry={nodes.Object_8023.geometry}
+ 678:           material={materials.bleu_002}
+ 679:         />
+ 680:         <mesh
+ 681:           castShadow
+ 682:           receiveShadow
+ 683:           geometry={nodes.Object_8024.geometry}
+ 684:           material={materials.bleu_002}
+ 685:         />
+ 686:         <mesh
+ 687:           castShadow
+ 688:           receiveShadow
+ 689:           geometry={nodes.Object_8025.geometry}
+ 690:           material={materials.bleu_002}
+ 691:         />
+ 692:         <mesh
+ 693:           castShadow
+ 694:           receiveShadow
+ 695:           geometry={nodes.Object_8026.geometry}
+ 696:           material={materials.bleu_002}
+ 697:         />
+ 698:         <mesh
+ 699:           castShadow
+ 700:           receiveShadow
+ 701:           geometry={nodes.Object_8027.geometry}
+ 702:           material={materials.bleu_002}
+ 703:         />
+ 704:         <mesh
+ 705:           castShadow
+ 706:           receiveShadow
+ 707:           geometry={nodes.Object_8028.geometry}
+ 708:           material={materials.bleu_002}
+ 709:         />
+ 710:         <mesh
+ 711:           castShadow
+ 712:           receiveShadow
+ 713:           geometry={nodes.Object_8029.geometry}
+ 714:           material={materials.bleu_002}
+ 715:         />
+ 716:         <mesh
+ 717:           castShadow
+ 718:           receiveShadow
+ 719:           geometry={nodes.Object_8030.geometry}
+ 720:           material={materials.bleu_002}
+ 721:         />
+ 722:         <mesh
+ 723:           castShadow
+ 724:           receiveShadow
+ 725:           geometry={nodes.Object_8031.geometry}
+ 726:           material={materials.bleu_002}
+ 727:         />
+ 728:         <mesh
+ 729:           castShadow
+ 730:           receiveShadow
+ 731:           geometry={nodes.Object_8032.geometry}
+ 732:           material={materials.bleu_002}
+ 733:         />
+ 734:         <mesh
+ 735:           castShadow
+ 736:           receiveShadow
+ 737:           geometry={nodes.Object_8033.geometry}
+ 738:           material={materials.bleu_002}
+ 739:         />
+ 740:         <mesh
+ 741:           castShadow
+ 742:           receiveShadow
+ 743:           geometry={nodes.Object_8038.geometry}
+ 744:           material={materials.bleu_002}
+ 745:         />
+ 746:         <mesh
+ 747:           castShadow
+ 748:           receiveShadow
+ 749:           geometry={nodes.Object_8039.geometry}
+ 750:           material={materials.bleu_002}
+ 751:         />
+ 752:         <mesh
+ 753:           castShadow
+ 754:           receiveShadow
+ 755:           geometry={nodes.Object_8040.geometry}
+ 756:           material={materials.bleu_002}
+ 757:         />
+ 758:         <mesh
+ 759:           castShadow
+ 760:           receiveShadow
+ 761:           geometry={nodes.Object_8041.geometry}
+ 762:           material={materials.bleu_002}
+ 763:         />
+ 764:         <mesh
+ 765:           castShadow
+ 766:           receiveShadow
+ 767:           geometry={nodes.Object_80.geometry}
+ 768:           material={materials.vitrine_000___mat_vitrine_verre}
+ 769:         />
+ 770:         <mesh
+ 771:           castShadow
+ 772:           receiveShadow
+ 773:           geometry={nodes.Object_81.geometry}
+ 774:           material={materials.wc_004___wc_004_blinn1sg}
+ 775:         />
+ 776:         <mesh
+ 777:           castShadow
+ 778:           receiveShadow
+ 779:           geometry={nodes.Object_82.geometry}
+ 780:           material={materials.wc_004___wc_004_blinn3sg}
+ 781:         />
+ 782:         <mesh
+ 783:           castShadow
+ 784:           receiveShadow
+ 785:           geometry={nodes.Object_83.geometry}
+ 786:           material={materials.ws13d0020}
+ 787:         />
+ 788:         <mesh
+ 789:           castShadow
+ 790:           receiveShadow
+ 791:           geometry={nodes.Object_84.geometry}
+ 792:           material={materials['--_ovcol6b5a2ecolpic06contpic09']}
+ 793:         />
+ 794:         <mesh
+ 795:           castShadow
+ 796:           receiveShadow
+ 797:           geometry={nodes.Object_85.geometry}
+ 798:           material={materials['-------76810378']}
+ 799:         />
+ 800:         <mesh
+ 801:           castShadow
+ 802:           receiveShadow
+ 803:           geometry={nodes.Object_9.geometry}
+ 804:           material={materials.bleu_004}
+ 805:         />
+ 806:         <mesh
+ 807:           castShadow
+ 808:           receiveShadow
+ 809:           geometry={nodes.Object_9001.geometry}
+ 810:           material={materials.bleu_004}
+ 811:         />
+ 812:         <mesh
+ 813:           castShadow
+ 814:           receiveShadow
+ 815:           geometry={nodes.Object_9002.geometry}
+ 816:           material={materials.bleu_004}
+ 817:         />
+ 818:         <mesh
+ 819:           castShadow
+ 820:           receiveShadow
+ 821:           geometry={nodes.Object_9003.geometry}
+ 822:           material={materials.bleu_004}
+ 823:         />
+ 824:         <mesh
+ 825:           castShadow
+ 826:           receiveShadow
+ 827:           geometry={nodes.Object_9004.geometry}
+ 828:           material={materials.bleu_004}
+ 829:         />
+ 830:         <mesh
+ 831:           castShadow
+ 832:           receiveShadow
+ 833:           geometry={nodes.Object_9005.geometry}
+ 834:           material={materials.bleu_004}
+ 835:         />
+ 836:         <mesh
+ 837:           castShadow
+ 838:           receiveShadow
+ 839:           geometry={nodes.Object_9006.geometry}
+ 840:           material={materials.bleu_004}
+ 841:         />
+ 842:         <mesh
+ 843:           castShadow
+ 844:           receiveShadow
+ 845:           geometry={nodes.Object_9007.geometry}
+ 846:           material={materials.bleu_004}
+ 847:         />
+ 848:         <mesh
+ 849:           castShadow
+ 850:           receiveShadow
+ 851:           geometry={nodes.Object_9008.geometry}
+ 852:           material={materials.bleu_004}
+ 853:         />
+ 854:         <mesh
+ 855:           castShadow
+ 856:           receiveShadow
+ 857:           geometry={nodes.Object_9009.geometry}
+ 858:           material={materials.bleu_004}
+ 859:         />
+ 860:         <mesh
+ 861:           castShadow
+ 862:           receiveShadow
+ 863:           geometry={nodes.Object_9010.geometry}
+ 864:           material={materials.bleu_004}
+ 865:         />
+ 866:         <mesh
+ 867:           castShadow
+ 868:           receiveShadow
+ 869:           geometry={nodes.Object_9011.geometry}
+ 870:           material={materials.bleu_004}
+ 871:         />
+ 872:         <mesh
+ 873:           castShadow
+ 874:           receiveShadow
+ 875:           geometry={nodes.Object_9012.geometry}
+ 876:           material={materials.bleu_004}
+ 877:         />
+ 878:         <mesh
+ 879:           castShadow
+ 880:           receiveShadow
+ 881:           geometry={nodes.Object_9013.geometry}
+ 882:           material={materials.bleu_004}
+ 883:         />
+ 884:         <mesh
+ 885:           castShadow
+ 886:           receiveShadow
+ 887:           geometry={nodes.Object_9014.geometry}
+ 888:           material={materials.bleu_004}
+ 889:         />
+ 890:         <mesh
+ 891:           castShadow
+ 892:           receiveShadow
+ 893:           geometry={nodes.Object_9015.geometry}
+ 894:           material={materials.bleu_004}
+ 895:         />
+ 896:         <mesh
+ 897:           castShadow
+ 898:           receiveShadow
+ 899:           geometry={nodes.Object_9016.geometry}
+ 900:           material={materials.bleu_004}
+ 901:         />
+ 902:         <mesh
+ 903:           castShadow
+ 904:           receiveShadow
+ 905:           geometry={nodes.Object_9017.geometry}
+ 906:           material={materials.bleu_004}
+ 907:         />
+ 908:         <mesh
+ 909:           castShadow
+ 910:           receiveShadow
+ 911:           geometry={nodes.Object_9018.geometry}
+ 912:           material={materials.bleu_004}
+ 913:         />
+ 914:         <mesh
+ 915:           castShadow
+ 916:           receiveShadow
+ 917:           geometry={nodes.Object_9019.geometry}
+ 918:           material={materials.bleu_004}
+ 919:         />
+ 920:         <mesh
+ 921:           castShadow
+ 922:           receiveShadow
+ 923:           geometry={nodes.Object_9020.geometry}
+ 924:           material={materials.bleu_004}
+ 925:         />
+ 926:         <mesh
+ 927:           castShadow
+ 928:           receiveShadow
+ 929:           geometry={nodes.Object_9021.geometry}
+ 930:           material={materials.bleu_004}
+ 931:         />
+ 932:         <mesh
+ 933:           castShadow
+ 934:           receiveShadow
+ 935:           geometry={nodes.Object_9022.geometry}
+ 936:           material={materials.bleu_004}
+ 937:         />
+ 938:         <mesh
+ 939:           castShadow
+ 940:           receiveShadow
+ 941:           geometry={nodes.Object_9023.geometry}
+ 942:           material={materials.bleu_004}
+ 943:         />
+ 944:         <mesh
+ 945:           castShadow
+ 946:           receiveShadow
+ 947:           geometry={nodes.Object_9024.geometry}
+ 948:           material={materials.bleu_004}
+ 949:         />
+ 950:         <mesh
+ 951:           castShadow
+ 952:           receiveShadow
+ 953:           geometry={nodes.Object_9025.geometry}
+ 954:           material={materials.bleu_004}
+ 955:         />
+ 956:         <mesh
+ 957:           castShadow
+ 958:           receiveShadow
+ 959:           geometry={nodes.Object_9026.geometry}
+ 960:           material={materials.bleu_004}
+ 961:         />
+ 962:         <mesh
+ 963:           castShadow
+ 964:           receiveShadow
+ 965:           geometry={nodes.Object_9027.geometry}
+ 966:           material={materials.bleu_004}
+ 967:         />
+ 968:         <mesh
+ 969:           castShadow
+ 970:           receiveShadow
+ 971:           geometry={nodes.Object_9028.geometry}
+ 972:           material={materials.bleu_004}
+ 973:         />
+ 974:         <mesh
+ 975:           castShadow
+ 976:           receiveShadow
+ 977:           geometry={nodes.Object_9029.geometry}
+ 978:           material={materials.bleu_004}
+ 979:         />
+ 980:         <mesh
+ 981:           castShadow
+ 982:           receiveShadow
+ 983:           geometry={nodes.Object_9030.geometry}
+ 984:           material={materials.bleu_004}
+ 985:         />
+ 986:         <mesh
+ 987:           castShadow
+ 988:           receiveShadow
+ 989:           geometry={nodes.Object_9031.geometry}
+ 990:           material={materials.bleu_004}
+ 991:         />
+ 992:         <mesh
+ 993:           castShadow
+ 994:           receiveShadow
+ 995:           geometry={nodes.Object_9032.geometry}
+ 996:           material={materials.bleu_004}
+ 997:         />
+ 998:         <mesh
+ 999:           castShadow
+1000:           receiveShadow
+1001:           geometry={nodes.Object_9033.geometry}
+1002:           material={materials.bleu_004}
+1003:         />
+1004:         <mesh
+1005:           castShadow
+1006:           receiveShadow
+1007:           geometry={nodes.Object_9042.geometry}
+1008:           material={materials.bleu_004}
+1009:         />
+1010:         <mesh
+1011:           castShadow
+1012:           receiveShadow
+1013:           geometry={nodes.Object_9043.geometry}
+1014:           material={materials.bleu_004}
+1015:         />
+1016:         <mesh
+1017:           castShadow
+1018:           receiveShadow
+1019:           geometry={nodes.Object_9044.geometry}
+1020:           material={materials.bleu_004}
+1021:         />
+1022:         <mesh
+1023:           castShadow
+1024:           receiveShadow
+1025:           geometry={nodes.Object_9045.geometry}
+1026:           material={materials.bleu_004}
+1027:         />
+1028:         <mesh
+1029:           castShadow
+1030:           receiveShadow
+1031:           geometry={nodes.Object_9046.geometry}
+1032:           material={materials.bleu_004}
+1033:         />
+1034:         <mesh
+1035:           castShadow
+1036:           receiveShadow
+1037:           geometry={nodes.Object_9047.geometry}
+1038:           material={materials.bleu_004}
+1039:         />
+1040:         <mesh
+1041:           castShadow
+1042:           receiveShadow
+1043:           geometry={nodes.Object_9048.geometry}
+1044:           material={materials.bleu_004}
+1045:         />
+1046:         <mesh
+1047:           castShadow
+1048:           receiveShadow
+1049:           geometry={nodes.Object_9049.geometry}
+1050:           material={materials.bleu_004}
+1051:         />
+1052:         <mesh
+1053:           castShadow
+1054:           receiveShadow
+1055:           geometry={nodes.Object_9054.geometry}
+1056:           material={materials.bleu_004}
+1057:         />
+1058:         <mesh
+1059:           castShadow
+1060:           receiveShadow
+1061:           geometry={nodes.Object_9055.geometry}
+1062:           material={materials.bleu_004}
+1063:         />
+1064:         <mesh
+1065:           castShadow
+1066:           receiveShadow
+1067:           geometry={nodes.SOFA01_TABLE01.geometry}
+1068:           material={materials.meridienne_001___mat_tissus078_bissg}
+1069:         />
+1070:         <mesh
+1071:           castShadow
+1072:           receiveShadow
+1073:           geometry={nodes.SOFA01_TABLE02.geometry}
+1074:           material={materials.meridienne_001___mat_tissus078_bissg}
+1075:         />
+1076:         <mesh
+1077:           castShadow
+1078:           receiveShadow
+1079:           geometry={nodes.SOFA01_TABLE03.geometry}
+1080:           material={materials.meridienne_001___mat_tissus078_bissg}
+1081:         />
+1082:         <mesh
+1083:           castShadow
+1084:           receiveShadow
+1085:           geometry={nodes.SOFA02_TABLE02.geometry}
+1086:           material={materials.meridienne_001___mat_tissus078_bissg}
+1087:         />
+1088:         <mesh
+1089:           castShadow
+1090:           receiveShadow
+1091:           geometry={nodes.SOFA02_TABLE03.geometry}
+1092:           material={materials.meridienne_001___mat_tissus078_bissg}
+1093:         />
+1094:         <mesh
+1095:           castShadow
+1096:           receiveShadow
+1097:           geometry={nodes.Object_56_1.geometry}
+1098:           material={materials.pack_004_cuisine_001_chaise___pied}
+1099:         />
+1100:         <mesh
+1101:           castShadow
+1102:           receiveShadow
+1103:           geometry={nodes.Object_56_2.geometry}
+1104:           material={materials.pack_004_cuisine_001_chaise___rond}
+1105:         />
+1106:         <mesh
+1107:           castShadow
+1108:           receiveShadow
+1109:           geometry={nodes.Object_56_3.geometry}
+1110:           material={materials.pack_004_cuisine_001_chaise___tour}
+1111:         />
+1112:         <mesh
+1113:           castShadow
+1114:           receiveShadow
+1115:           geometry={nodes.Object_56_4.geometry}
+1116:           material={materials.pack_004_cuisine_001_chaise___tubes}
+1117:         />
+1118:         <mesh
+1119:           castShadow
+1120:           receiveShadow
+1121:           geometry={nodes.Object_56_5.geometry}
+1122:           material={materials.bois_046}
+1123:         />
+1124:         <mesh
+1125:           castShadow
+1126:           receiveShadow
+1127:           geometry={nodes.Object_16008.geometry}
+1128:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1129:         />
+1130:         <mesh
+1131:           castShadow
+1132:           receiveShadow
+1133:           geometry={nodes.Object_16008_1.geometry}
+1134:           material={materials.bleu_002}
+1135:         />
+1136:         <mesh
+1137:           castShadow
+1138:           receiveShadow
+1139:           geometry={nodes.Object_16064.geometry}
+1140:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1141:         />
+1142:         <mesh
+1143:           castShadow
+1144:           receiveShadow
+1145:           geometry={nodes.Object_16064_1.geometry}
+1146:           material={materials.bleu_002}
+1147:         />
+1148:         <mesh
+1149:           castShadow
+1150:           receiveShadow
+1151:           geometry={nodes.Object_16016.geometry}
+1152:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1153:         />
+1154:         <mesh
+1155:           castShadow
+1156:           receiveShadow
+1157:           geometry={nodes.Object_16016_1.geometry}
+1158:           material={materials.bleu_012}
+1159:         />
+1160:         <mesh
+1161:           castShadow
+1162:           receiveShadow
+1163:           geometry={nodes.Object_58019.geometry}
+1164:           material={materials.pack_004_cuisine_001_chaise___tour}
+1165:         />
+1166:         <mesh
+1167:           castShadow
+1168:           receiveShadow
+1169:           geometry={nodes.Object_58019_1.geometry}
+1170:           material={materials.bois_046}
+1171:         />
+1172:         <mesh
+1173:           castShadow
+1174:           receiveShadow
+1175:           geometry={nodes.Object_58019_2.geometry}
+1176:           material={materials.pack_004_cuisine_001_chaise___tubes}
+1177:         />
+1178:         <mesh
+1179:           castShadow
+1180:           receiveShadow
+1181:           geometry={nodes.Object_58019_3.geometry}
+1182:           material={materials.pack_004_cuisine_001_chaise___pied}
+1183:         />
+1184:         <mesh
+1185:           castShadow
+1186:           receiveShadow
+1187:           geometry={nodes.Object_58019_4.geometry}
+1188:           material={materials.pack_004_cuisine_001_chaise___rond}
+1189:         />
+1190:         <mesh
+1191:           castShadow
+1192:           receiveShadow
+1193:           geometry={nodes.Object_16001.geometry}
+1194:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1195:         />
+1196:         <mesh
+1197:           castShadow
+1198:           receiveShadow
+1199:           geometry={nodes.Object_16001_1.geometry}
+1200:           material={materials.bleu_012}
+1201:         />
+1202:         <mesh
+1203:           castShadow
+1204:           receiveShadow
+1205:           geometry={nodes.Object_16056.geometry}
+1206:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1207:         />
+1208:         <mesh
+1209:           castShadow
+1210:           receiveShadow
+1211:           geometry={nodes.Object_16056_1.geometry}
+1212:           material={materials.bleu_004}
+1213:         />
+1214:         <mesh
+1215:           castShadow
+1216:           receiveShadow
+1217:           geometry={nodes.Object_16024.geometry}
+1218:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1219:         />
+1220:         <mesh
+1221:           castShadow
+1222:           receiveShadow
+1223:           geometry={nodes.Object_16024_1.geometry}
+1224:           material={materials.bleu_004}
+1225:         />
+1226:         <mesh
+1227:           castShadow
+1228:           receiveShadow
+1229:           geometry={nodes.Object_16048.geometry}
+1230:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1231:         />
+1232:         <mesh
+1233:           castShadow
+1234:           receiveShadow
+1235:           geometry={nodes.Object_16048_1.geometry}
+1236:           material={materials.bleu_012}
+1237:         />
+1238:         <mesh
+1239:           castShadow
+1240:           receiveShadow
+1241:           geometry={nodes.Object_16032.geometry}
+1242:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1243:         />
+1244:         <mesh
+1245:           castShadow
+1246:           receiveShadow
+1247:           geometry={nodes.Object_16032_1.geometry}
+1248:           material={materials.bleu_002}
+1249:         />
+1250:         <mesh
+1251:           castShadow
+1252:           receiveShadow
+1253:           geometry={nodes.Object_16072.geometry}
+1254:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1255:         />
+1256:         <mesh
+1257:           castShadow
+1258:           receiveShadow
+1259:           geometry={nodes.Object_16072_1.geometry}
+1260:           material={materials.bleu_002}
+1261:         />
+1262:         <mesh
+1263:           castShadow
+1264:           receiveShadow
+1265:           geometry={nodes.Object_16040.geometry}
+1266:           material={materials.eames_chair_dining_2____eames_chair_dinning_bwood}
+1267:         />
+1268:         <mesh
+1269:           castShadow
+1270:           receiveShadow
+1271:           geometry={nodes.Object_16040_1.geometry}
+1272:           material={materials.bleu_004}
+1273:         />
+1274:         <mesh
+1275:           castShadow
+1276:           receiveShadow
+1277:           geometry={nodes.Object_73_1.geometry}
+1278:           material={materials.tissus_078}
+1279:         />
+1280:         <mesh
+1281:           castShadow
+1282:           receiveShadow
+1283:           geometry={nodes.Object_73_2.geometry}
+1284:           material={materials.meridienne_001___mat_tissus078_bissg}
+1285:         />
+1286:         <mesh
+1287:           castShadow
+1288:           receiveShadow
+1289:           geometry={nodes.Object_76_1.geometry}
+1290:           material={materials.tissus_096}
+1291:         />
+1292:         <mesh
+1293:           castShadow
+1294:           receiveShadow
+1295:           geometry={nodes.Object_76_2.geometry}
+1296:           material={materials.meridienne_001___mat_tissus078_bissg}
+1297:         />
+1298:       </group>
+1299:     </group>
+1300:   )
+1301: }
+1302: useGLTF.preload('/cafe.glb')
+
+================
+File: src/configs/ModelRegistry.js
+================
+1: import { kitchenModelConfig } from "./KitchenModelConfig.js";
+2: import { cafeModelConfig } from "./CafeModelConfig.js";
+3: export const modelRegistry = {
+4:   kitchen: kitchenModelConfig,
+5:   cafe: cafeModelConfig,
+6: };
 
 ================
 File: src/context/ModelProvider.js
@@ -522,7 +3222,7 @@ File: src/context/ModelProvider.js
   6:   useCallback,
   7: } from "react";
   8: import { useGLTF } from "@react-three/drei";
-  9: import { modelRegistry } from "../configs/ModelConfig";
+  9: import { modelRegistry } from "../configs/ModelRegistry";
  10: const ModelContext = createContext(null);
  11: export const ModelProvider = ({ children, initialModelKey = "kitchen" }) => {
  12:   const [currentModelKey, setCurrentModelKey] = useState(initialModelKey);
@@ -530,94 +3230,97 @@ File: src/context/ModelProvider.js
  14:     modelRegistry[initialModelKey]
  15:   );
  16:   const [selectedItems, setSelectedItems] = useState([]);
- 17:   const [occupiedItems, setOccupiedItems] = useState(["CHAIR1", "CHAIR3"]);
- 18:   const [isLoading, setIsLoading] = useState(true);
- 19:   useGLTF.preload(modelConfig?.modelPath);
- 20:   useEffect(() => {
- 21:     const config = modelRegistry[currentModelKey];
- 22:     if (config) {
- 23:       setModelConfig(config);
- 24:       setIsLoading(true);
- 25:       useGLTF.preload(config.modelPath, () => {
- 26:         setIsLoading(false);
- 27:       });
- 28:       setSelectedItems([]);
- 29:     } else {
- 30:       console.error(`Model configuration for "${currentModelKey}" not found`);
- 31:     }
- 32:   }, [currentModelKey]);
- 33:   const changeModel = useCallback((modelKey) => {
- 34:     if (modelRegistry[modelKey]) {
- 35:       setCurrentModelKey(modelKey);
- 36:     } else {
- 37:       console.error(`Model "${modelKey}" not found in registry`);
- 38:     }
- 39:   }, []);
- 40:   const toggleItemSelection = useCallback(
- 41:     (itemId) => {
- 42:       if (occupiedItems.includes(itemId)) {
- 43:         return;
- 44:       }
- 45:       setSelectedItems((prev) => {
- 46:         if (prev.includes(itemId)) {
- 47:           return prev.filter((id) => id !== itemId);
- 48:         } else {
- 49:           return [...prev, itemId];
- 50:         }
- 51:       });
- 52:     },
- 53:     [occupiedItems]
- 54:   );
- 55:   const setItemsAsOccupied = useCallback((itemIds) => {
- 56:     if (!Array.isArray(itemIds)) {
- 57:       itemIds = [itemIds];
- 58:     }
- 59:     setSelectedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
- 60:     setOccupiedItems((prev) => {
- 61:       const newOccupied = [...prev];
- 62:       itemIds.forEach((id) => {
- 63:         if (!newOccupied.includes(id)) {
- 64:           newOccupied.push(id);
- 65:         }
- 66:       });
- 67:       return newOccupied;
- 68:     });
- 69:   }, []);
- 70:   const clearOccupancy = useCallback((itemIds) => {
- 71:     if (!Array.isArray(itemIds)) {
- 72:       itemIds = [itemIds];
- 73:     }
- 74:     setOccupiedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
- 75:   }, []);
- 76:   const availableItems =
- 77:     modelConfig?.selectableItems.map((item) => item.id) || [];
- 78:   const contextValue = {
- 79:     currentModelKey,
- 80:     modelConfig,
- 81:     isLoading,
- 82:     selectedItems,
- 83:     occupiedItems,
- 84:     availableItems,
- 85:     changeModel,
- 86:     toggleItemSelection,
- 87:     setSelectedItems,
- 88:     setOccupiedItems,
- 89:     setItemsAsOccupied,
- 90:     clearOccupancy,
- 91:   };
- 92:   return (
- 93:     <ModelContext.Provider value={contextValue}>
- 94:       {children}
- 95:     </ModelContext.Provider>
- 96:   );
- 97: };
- 98: export const useModel = () => {
- 99:   const context = useContext(ModelContext);
-100:   if (!context) {
-101:     throw new Error("useModel must be used within a ModelProvider");
-102:   }
-103:   return context;
-104: };
+ 17:   const [occupiedItems, setOccupiedItems] = useState([
+ 18:     "CHAIR03_TABLE05",
+ 19:     "CHAIR02_TABLE05",
+ 20:   ]);
+ 21:   const [isLoading, setIsLoading] = useState(true);
+ 22:   useGLTF.preload(modelConfig?.modelPath);
+ 23:   useEffect(() => {
+ 24:     const config = modelRegistry[currentModelKey];
+ 25:     if (config) {
+ 26:       setModelConfig(config);
+ 27:       setIsLoading(true);
+ 28:       useGLTF.preload(config.modelPath, () => {
+ 29:         setIsLoading(false);
+ 30:       });
+ 31:       setSelectedItems([]);
+ 32:     } else {
+ 33:       console.error(`Model configuration for "${currentModelKey}" not found`);
+ 34:     }
+ 35:   }, [currentModelKey]);
+ 36:   const changeModel = useCallback((modelKey) => {
+ 37:     if (modelRegistry[modelKey]) {
+ 38:       setCurrentModelKey(modelKey);
+ 39:     } else {
+ 40:       console.error(`Model "${modelKey}" not found in registry`);
+ 41:     }
+ 42:   }, []);
+ 43:   const toggleItemSelection = useCallback(
+ 44:     (itemId) => {
+ 45:       if (occupiedItems.includes(itemId)) {
+ 46:         return;
+ 47:       }
+ 48:       setSelectedItems((prev) => {
+ 49:         if (prev.includes(itemId)) {
+ 50:           return prev.filter((id) => id !== itemId);
+ 51:         } else {
+ 52:           return [...prev, itemId];
+ 53:         }
+ 54:       });
+ 55:     },
+ 56:     [occupiedItems]
+ 57:   );
+ 58:   const setItemsAsOccupied = useCallback((itemIds) => {
+ 59:     if (!Array.isArray(itemIds)) {
+ 60:       itemIds = [itemIds];
+ 61:     }
+ 62:     setSelectedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
+ 63:     setOccupiedItems((prev) => {
+ 64:       const newOccupied = [...prev];
+ 65:       itemIds.forEach((id) => {
+ 66:         if (!newOccupied.includes(id)) {
+ 67:           newOccupied.push(id);
+ 68:         }
+ 69:       });
+ 70:       return newOccupied;
+ 71:     });
+ 72:   }, []);
+ 73:   const clearOccupancy = useCallback((itemIds) => {
+ 74:     if (!Array.isArray(itemIds)) {
+ 75:       itemIds = [itemIds];
+ 76:     }
+ 77:     setOccupiedItems((prev) => prev.filter((id) => !itemIds.includes(id)));
+ 78:   }, []);
+ 79:   const availableItems =
+ 80:     modelConfig?.selectableItems.map((item) => item.id) || [];
+ 81:   const contextValue = {
+ 82:     currentModelKey,
+ 83:     modelConfig,
+ 84:     isLoading,
+ 85:     selectedItems,
+ 86:     occupiedItems,
+ 87:     availableItems,
+ 88:     changeModel,
+ 89:     toggleItemSelection,
+ 90:     setSelectedItems,
+ 91:     setOccupiedItems,
+ 92:     setItemsAsOccupied,
+ 93:     clearOccupancy,
+ 94:   };
+ 95:   return (
+ 96:     <ModelContext.Provider value={contextValue}>
+ 97:       {children}
+ 98:     </ModelContext.Provider>
+ 99:   );
+100: };
+101: export const useModel = () => {
+102:   const context = useContext(ModelContext);
+103:   if (!context) {
+104:     throw new Error("useModel must be used within a ModelProvider");
+105:   }
+106:   return context;
+107: };
 
 ================
 File: src/hooks/useContentHeight.js
@@ -657,29 +3360,31 @@ File: src/hooks/useDebouncedHover.js
  3: const useDebouncedHover = (delay = 30) => {
  4:   const [hovered, setHovered] = useState(null);
  5:   const debouncedSetHovered = useCallback(
- 6:     debounce((name) => {
- 7:       setHovered(name);
- 8:     }, delay),
- 9:     [delay]
-10:   );
-11:   const handlePointerOver = useCallback(
-12:     (name, occupiedChairs) => (e) => {
-13:       e.stopPropagation();
-14:       if (occupiedChairs.includes(name)) return;
-15:       debouncedSetHovered(name);
-16:     },
-17:     [debouncedSetHovered]
-18:   );
-19:   const handlePointerOut = useCallback(() => {
-20:     debouncedSetHovered(null);
-21:   }, [debouncedSetHovered]);
-22:   return {
-23:     hovered,
-24:     handlePointerOver,
-25:     handlePointerOut,
-26:   };
-27: };
-28: export default useDebouncedHover;
+ 6:     (name) => {
+ 7:       debounce(() => {
+ 8:         setHovered(name);
+ 9:       }, delay)();
+10:     },
+11:     [delay]
+12:   );
+13:   const handlePointerOver = useCallback(
+14:     (name, occupiedChairs) => (e) => {
+15:       e.stopPropagation();
+16:       if (occupiedChairs.includes(name)) return;
+17:       debouncedSetHovered(name);
+18:     },
+19:     [debouncedSetHovered]
+20:   );
+21:   const handlePointerOut = useCallback(() => {
+22:     debouncedSetHovered(null);
+23:   }, [debouncedSetHovered]);
+24:   return {
+25:     hovered,
+26:     handlePointerOver,
+27:     handlePointerOut,
+28:   };
+29: };
+30: export default useDebouncedHover;
 
 ================
 File: src/hooks/useReactNativeMessaging.js
@@ -709,79 +3414,130 @@ File: src/hooks/useReactNativeMessaging.js
 23:         setOccupiedItems(occupied);
 24:       }
 25:     };
-26:     return () => {
-27:       delete window.updateItems;
-28:     };
-29:   }, [setSelectedItems, setOccupiedItems]);
-30:   return {
-31:     postMessageToRN,
-32:     notifyInteractionStart,
-33:     notifyInteractionEnd,
-34:   };
-35: };
+26:     postMessageToRN({
+27:       type: "webViewReady",
+28:     });
+29:     return () => {
+30:       delete window.updateItems;
+31:     };
+32:   }, [setSelectedItems, setOccupiedItems, postMessageToRN]);
+33:   return {
+34:     postMessageToRN,
+35:     notifyInteractionStart,
+36:     notifyInteractionEnd,
+37:   };
+38: };
 
 ================
 File: src/App.js
 ================
- 1: import React, { useEffect } from "react";
- 2: import { Scene } from "./components/Scene";
- 3: import { useReactNativeMessaging } from "./hooks/useReactNativeMessaging";
- 4: import { useContentHeight } from "./hooks/useContentHeight";
- 5: import { ModelProvider, useModel } from "./context/ModelProvider";
- 6: function App() {
- 7:   return (
- 8:     <ModelProvider initialModelKey="kitchen">
- 9:       <RestaurantApp />
-10:     </ModelProvider>
-11:   );
-12: }
-13: function RestaurantApp() {
-14:   const {
-15:     modelConfig,
-16:     selectedItems,
-17:     occupiedItems,
-18:     setSelectedItems,
-19:     setOccupiedItems,
-20:     toggleItemSelection,
-21:     changeModel,
-22:   } = useModel();
-23:   const { notifyInteractionStart, notifyInteractionEnd, postMessageToRN } =
-24:     useReactNativeMessaging(setSelectedItems, setOccupiedItems);
-25:   useContentHeight();
-26:   const handleItemClicked = (itemId) => {
-27:     toggleItemSelection(itemId);
-28:   };
-29:   useEffect(() => {
-30:     window.changeRestaurantModel = (modelKey) => {
-31:       changeModel(modelKey);
-32:       postMessageToRN({
-33:         type: "modelChanged",
-34:         modelKey,
-35:         availableItems: modelConfig.selectableItems.map((item) => item.id),
-36:       });
-37:     };
-38:     return () => {
-39:       delete window.changeRestaurantModel;
-40:     };
-41:   }, [changeModel, modelConfig, postMessageToRN]);
-42:   return (
-43:     <div
-44:       style={{ width: "100%" }}
-45:       onTouchStart={notifyInteractionStart}
-46:       onTouchEnd={notifyInteractionEnd}
-47:       onMouseDown={notifyInteractionStart}
-48:       onMouseUp={notifyInteractionEnd}
-49:     >
-50:       <Scene
-51:         modelConfig={modelConfig}
-52:         selectedItems={selectedItems}
-53:         occupiedItems={occupiedItems}
-54:         onItemClicked={handleItemClicked}
-55:       />
-56:     </div>
-57:   );
-58: }
-59: export default App;
+  1: import React, { useEffect, useState } from "react";
+  2: import { Scene } from "./components/Scene";
+  3: import { useReactNativeMessaging } from "./hooks/useReactNativeMessaging";
+  4: import { useContentHeight } from "./hooks/useContentHeight";
+  5: import { ModelProvider, useModel } from "./context/ModelProvider";
+  6: function App() {
+  7:   return (
+  8:     <ModelProvider initialModelKey="cafe">
+  9:       <RestaurantApp />
+ 10:     </ModelProvider>
+ 11:   );
+ 12: }
+ 13: function RestaurantApp() {
+ 14:   const {
+ 15:     modelConfig,
+ 16:     selectedItems,
+ 17:     occupiedItems,
+ 18:     setSelectedItems,
+ 19:     setOccupiedItems,
+ 20:     toggleItemSelection,
+ 21:     changeModel,
+ 22:   } = useModel();
+ 23:   const [debugMode, setDebugMode] = useState(false);
+ 24:   const { notifyInteractionStart, notifyInteractionEnd, postMessageToRN } =
+ 25:     useReactNativeMessaging(setSelectedItems, setOccupiedItems);
+ 26:   useContentHeight();
+ 27:   const handleItemClicked = (itemId) => {
+ 28:     toggleItemSelection(itemId);
+ 29:   };
+ 30:   useEffect(() => {
+ 31:     window.changeRestaurantModel = (modelKey) => {
+ 32:       changeModel(modelKey);
+ 33:       postMessageToRN({
+ 34:         type: "modelChanged",
+ 35:         modelKey,
+ 36:         availableItems: modelConfig.selectableItems.map((item) => item.id),
+ 37:       });
+ 38:     };
+ 39:     window.toggleDebugMode = () => {
+ 40:       setDebugMode((prev) => !prev);
+ 41:       console.log(`Debug mode ${!debugMode ? "enabled" : "disabled"}`);
+ 42:     };
+ 43:     window.logModelState = () => {
+ 44:       console.log("Current Model State:", {
+ 45:         modelKey: modelConfig.modelPath,
+ 46:         selectedItems,
+ 47:         occupiedItems,
+ 48:         availableItems: modelConfig.selectableItems.map((item) => item.id),
+ 49:       });
+ 50:     };
+ 51:     return () => {
+ 52:       delete window.changeRestaurantModel;
+ 53:       delete window.toggleDebugMode;
+ 54:       delete window.logModelState;
+ 55:     };
+ 56:   }, [
+ 57:     changeModel,
+ 58:     modelConfig,
+ 59:     postMessageToRN,
+ 60:     debugMode,
+ 61:     selectedItems,
+ 62:     occupiedItems,
+ 63:   ]);
+ 64:   return (
+ 65:     <div
+ 66:       style={{ width: "100%" }}
+ 67:       onTouchStart={notifyInteractionStart}
+ 68:       onTouchEnd={notifyInteractionEnd}
+ 69:       onMouseDown={notifyInteractionStart}
+ 70:       onMouseUp={notifyInteractionEnd}
+ 71:     >
+ 72:       {}
+ 73:       {debugMode && (
+ 74:         <div
+ 75:           style={{
+ 76:             position: "absolute",
+ 77:             top: 10,
+ 78:             left: 10,
+ 79:             zIndex: 1000,
+ 80:             background: "rgba(0,0,0,0.8)",
+ 81:             color: "white",
+ 82:             padding: "10px",
+ 83:             borderRadius: "5px",
+ 84:             fontSize: "12px",
+ 85:           }}
+ 86:         >
+ 87:           <div>Debug Mode Active</div>
+ 88:           <div>Selected: {selectedItems.join(", ") || "None"}</div>
+ 89:           <div>Occupied: {occupiedItems.join(", ") || "None"}</div>
+ 90:           <button
+ 91:             onClick={() => window.logModelState()}
+ 92:             style={{ marginTop: "5px", fontSize: "10px" }}
+ 93:           >
+ 94:             Log State
+ 95:           </button>
+ 96:         </div>
+ 97:       )}
+ 98:       <Scene
+ 99:         modelConfig={modelConfig}
+100:         selectedItems={selectedItems}
+101:         occupiedItems={occupiedItems}
+102:         onItemClicked={handleItemClicked}
+103:       />
+104:     </div>
+105:   );
+106: }
+107: export default App;
 
 ================
 File: src/index.css

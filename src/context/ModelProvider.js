@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { useGLTF } from "@react-three/drei";
-import { modelRegistry } from "../configs/ModelConfig";
+import { modelRegistry } from "../configs/ModelRegistry";
 
 // Create a context for model data
 const ModelContext = createContext(null);
@@ -24,7 +24,10 @@ export const ModelProvider = ({ children, initialModelKey = "kitchen" }) => {
 
   // Selection state
   const [selectedItems, setSelectedItems] = useState([]);
-  const [occupiedItems, setOccupiedItems] = useState(["CHAIR1", "CHAIR3"]);
+  const [occupiedItems, setOccupiedItems] = useState([
+    "CHAIR03_TABLE05",
+    "CHAIR02_TABLE05",
+  ]);
 
   // Loading state
   const [isLoading, setIsLoading] = useState(true);

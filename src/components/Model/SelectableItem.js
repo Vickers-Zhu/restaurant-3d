@@ -1,18 +1,11 @@
-/* eslint-disable no-unused-vars */
 // src/components/Model/SelectableItem.js
 import React, { useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 
-/**
- * Generic component for any selectable item in the restaurant
- * Supports two-part geometry (outer/inner) with material changes for selection/occupied states
- */
 const SelectableItem = ({
   itemConfig,
-  geometryOuter,
-  geometryInner,
-  materialOuter,
-  materialInner,
+  geometries,
+  materials,
   modelConfig,
   selected,
   occupied,
@@ -21,82 +14,105 @@ const SelectableItem = ({
   onClick,
   clock,
 }) => {
-  const meshRef = useRef();
-  const innerMeshRef = useRef();
-  const { id, type } = itemConfig;
+  const groupRef = useRef();
+  const meshRefs = useRef([]);
+  const { id } = itemConfig;
 
-  // Create materials for different states
-  const emissiveMaterialOuterSelected = modelConfig.createEmissiveMaterial(
-    materialOuter,
-    modelConfig.selectionColor
-  );
-  const emissiveMaterialOuterOccupied = modelConfig.createEmissiveMaterial(
-    materialOuter,
-    modelConfig.occupiedColor
-  );
-  const emissiveMaterialInnerSelected = modelConfig.createEmissiveMaterial(
-    materialInner,
-    modelConfig.selectionColor
-  );
-  const emissiveMaterialInnerOccupied = modelConfig.createEmissiveMaterial(
-    materialInner,
-    modelConfig.occupiedColor
-  );
+  // Create emissive materials for each geometry part
+  const emissiveMaterials = geometries.map(({ materialName }) => {
+    const baseMaterial = materials[materialName];
+    return {
+      selected: modelConfig.createEmissiveMaterial(
+        baseMaterial,
+        modelConfig.selectionColor
+      ),
+      occupied: modelConfig.createEmissiveMaterial(
+        baseMaterial,
+        modelConfig.occupiedColor
+      ),
+      original: baseMaterial,
+    };
+  });
 
   // Update materials based on state
   useEffect(() => {
-    if (selected) {
-      meshRef.current.material = emissiveMaterialOuterSelected;
-      if (innerMeshRef.current) {
-        innerMeshRef.current.material = emissiveMaterialInnerSelected;
-      }
-    } else if (occupied) {
-      meshRef.current.material = emissiveMaterialOuterOccupied;
-      if (innerMeshRef.current) {
-        innerMeshRef.current.material = emissiveMaterialInnerOccupied;
-      }
-    } else {
-      meshRef.current.material = materialOuter;
-      if (innerMeshRef.current) {
-        innerMeshRef.current.material = materialInner;
-      }
-    }
-  }, [
-    selected,
-    occupied,
-    emissiveMaterialOuterSelected,
-    emissiveMaterialOuterOccupied,
-    emissiveMaterialInnerSelected,
-    emissiveMaterialInnerOccupied,
-    materialOuter,
-    materialInner,
-  ]);
+    meshRefs.current.forEach((meshRef, index) => {
+      if (!meshRef.current) return;
 
-  // Animate selected items
+      const materialSet = emissiveMaterials[index];
+      if (!materialSet) return;
+
+      if (selected) {
+        meshRef.current.material = materialSet.selected;
+      } else if (occupied) {
+        meshRef.current.material = materialSet.occupied;
+      } else {
+        meshRef.current.material = materialSet.original;
+        if (meshRef.current) {
+          meshRef.current.scale.set(1, 1, 1);
+        }
+      }
+    });
+  }, [selected, occupied, emissiveMaterials]);
+
+  // Animation frame updates
   useFrame(() => {
-    if (selected && meshRef.current) {
+    if (selected && groupRef.current) {
       const elapsed = clock.getElapsedTime();
-      const scale =
-        1 +
-        modelConfig.animationScale *
-          Math.sin(elapsed * modelConfig.animationSpeed);
-      meshRef.current.scale.set(scale, scale, scale);
+      const intensity =
+        modelConfig.emissiveIntensity *
+        (0.8 + 0.2 * Math.sin(elapsed * modelConfig.animationSpeed));
+
+      meshRefs.current.forEach((meshRef) => {
+        if (meshRef.current && meshRef.current.material.emissive) {
+          meshRef.current.material.emissiveIntensity = intensity;
+        }
+      });
+    } else if (occupied && groupRef.current) {
+      // Occupied items have static emissive intensity (no breathing animation)
+      meshRefs.current.forEach((meshRef) => {
+        if (meshRef.current && meshRef.current.material.emissive) {
+          meshRef.current.material.emissiveIntensity =
+            modelConfig.emissiveIntensity * 0.7;
+        }
+      });
     }
   });
 
+  // Ensure we have enough refs for all geometries
+  useEffect(() => {
+    meshRefs.current = meshRefs.current.slice(0, geometries.length);
+    while (meshRefs.current.length < geometries.length) {
+      meshRefs.current.push(React.createRef());
+    }
+  }, [geometries.length]);
+
   return (
-    <mesh
-      ref={meshRef}
-      geometry={geometryOuter}
+    <group
+      ref={groupRef}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
       onClick={onClick}
       name={id}
     >
-      {geometryInner && (
-        <mesh ref={innerMeshRef} geometry={geometryInner} name={id} />
-      )}
-    </mesh>
+      {geometries.map((geometryConfig, index) => {
+        if (!geometryConfig.geometry || !geometryConfig.material) {
+          return null;
+        }
+
+        return (
+          <mesh
+            key={`${id}-${index}`}
+            ref={meshRefs.current[index]}
+            geometry={geometryConfig.geometry}
+            material={geometryConfig.material}
+            name={`${id}-part-${index}`}
+            castShadow
+            receiveShadow
+          />
+        );
+      })}
+    </group>
   );
 };
 
