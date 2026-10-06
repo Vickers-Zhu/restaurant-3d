@@ -5,6 +5,7 @@ import { Clock } from "three";
 import SelectableItem from "./SelectableItem";
 import Effects from "./Effects";
 import useDebouncedHover from "../../hooks/useDebouncedHover";
+import { debugManager } from "../../debug/DebugManager";
 
 export function GenericModel({
   modelConfig,
@@ -19,97 +20,36 @@ export function GenericModel({
   const clock = useRef(new Clock());
   const { handlePointerOver, handlePointerOut } = useDebouncedHover(30);
 
-  // Debug logging
   useEffect(() => {
-    if (enableDebug) {
-      console.log("=== MODEL DEBUG INFO ===");
-      console.log("Available nodes:", Object.keys(nodes));
-      console.log("Available materials:", Object.keys(materials));
-      console.log("Model config:", modelConfig);
+    // Update debug manager with model data
+    debugManager.setModelData({ nodes, materials });
 
-      console.log("\n=== STATIC ITEMS CHECK ===");
-      modelConfig.staticItems.forEach((item, index) => {
-        const hasGeometry = nodes[item.geometryName];
-        const hasMaterial = materials[item.materialName];
-        console.log(`Static Item ${index}: ${item.name}`);
-        console.log(
-          `  Geometry '${item.geometryName}': ${
-            hasGeometry ? "✓ Found" : "✗ MISSING"
-          }`
-        );
-        console.log(
-          `  Material '${item.materialName}': ${
-            hasMaterial ? "✓ Found" : "✗ MISSING"
-          }`
-        );
-        if (!hasGeometry) {
-          console.warn(
-            `Missing geometry for static item: ${item.name} -> ${item.geometryName}`
-          );
-        }
-        if (!hasMaterial) {
-          console.warn(
-            `Missing material for static item: ${item.name} -> ${item.materialName}`
-          );
-        }
+    // Only run debug validation in development or when explicitly enabled
+    if (enableDebug || process.env.NODE_ENV === "development") {
+      debugManager.log("🔄 Model loaded", "info", {
+        modelPath: modelConfig.modelPath,
+        nodesCount: Object.keys(nodes).length,
+        materialsCount: Object.keys(materials).length,
       });
 
-      console.log("\n=== SELECTABLE ITEMS CHECK ===");
-      modelConfig.selectableItems.forEach((item, index) => {
-        console.log(`Selectable Item ${index}: ${item.id} (${item.type})`);
-        console.log(`  Geometries count: ${item.geometries?.length || 0}`);
+      // Validate configuration
+      debugManager.validateModelConfig(modelConfig);
 
-        if (item.geometries) {
-          item.geometries.forEach((geo, geoIndex) => {
-            const hasGeometry = nodes[geo.geometryName];
-            const hasMaterial = materials[geo.materialName];
-            console.log(`    Part ${geoIndex}:`);
-            console.log(
-              `      Geometry '${geo.geometryName}': ${
-                hasGeometry ? "✓ Found" : "✗ MISSING"
-              }`
-            );
-            console.log(
-              `      Material '${geo.materialName}': ${
-                hasMaterial ? "✓ Found" : "✗ MISSING"
-              }`
-            );
-            if (!hasGeometry) {
-              console.warn(
-                `Missing geometry for selectable item part: ${item.id} -> ${geo.geometryName}`
-              );
-            }
-            if (!hasMaterial) {
-              console.warn(
-                `Missing material for selectable item part: ${item.id} -> ${geo.materialName}`
-              );
-            }
-          });
-        }
-      });
-
-      console.log("\n=== SAMPLE AVAILABLE NODES ===");
-      Object.keys(nodes)
-        .slice(0, 10)
-        .forEach((key) => {
-          console.log(`Node: ${key}`, nodes[key]);
-        });
-
-      console.log("\n=== SAMPLE AVAILABLE MATERIALS ===");
-      Object.keys(materials)
-        .slice(0, 10)
-        .forEach((key) => {
-          console.log(`Material: ${key}`, materials[key]);
-        });
+      // Validate assets
+      debugManager.validateModelAssets(nodes, materials, modelConfig);
     }
   }, [nodes, materials, modelConfig, enableDebug]);
 
   const handleClick = useCallback(
     (itemId) => (e) => {
       e.stopPropagation();
+
+      debugManager.log(`🖱️ Item clicked: ${itemId}`, "info");
+
       if (onItemClicked) {
         onItemClicked(itemId);
       }
+
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
         window.ReactNativeWebView.postMessage(
           JSON.stringify({ type: "itemClicked", id: itemId })
@@ -119,44 +59,35 @@ export function GenericModel({
     [onItemClicked]
   );
 
-  // Helper function to prepare geometries for an item
   const prepareItemGeometries = (item) => {
     if (!item.geometries) {
-      if (enableDebug) {
-        console.warn(`Item ${item.id} has no geometries array`);
-      }
       return [];
     }
 
-    return item.geometries
-      .map((geoConfig) => {
-        const geometry = nodes[geoConfig.geometryName];
-        const material = materials[geoConfig.materialName];
+    const validGeometries = [];
 
-        if (!geometry || !material) {
-          if (enableDebug) {
-            console.warn(
-              `Skipping geometry part for item ${item.id}: missing ${
-                !geometry ? "geometry" : "material"
-              } (${geoConfig.geometryName} -> ${geoConfig.materialName})`
-            );
-          }
-          return null;
-        }
+    item.geometries.forEach((geoConfig) => {
+      const geometry = nodes[geoConfig.geometryName];
+      const material = materials[geoConfig.materialName];
 
-        return {
-          geometry: geometry.geometry,
-          material: material,
-          geometryName: geoConfig.geometryName,
-          materialName: geoConfig.materialName,
-        };
-      })
-      .filter(Boolean);
+      if (!geometry || !material) {
+        return;
+      }
+
+      validGeometries.push({
+        geometry: geometry.geometry,
+        material: material,
+        geometryName: geoConfig.geometryName,
+        materialName: geoConfig.materialName,
+      });
+    });
+
+    return validGeometries;
   };
 
   return (
     <group ref={groupRef} {...props}>
-      {/* Post-processing effects */}
+      {/* Effects */}
       <Effects
         selectedItems={selectedItems}
         occupiedItems={occupiedItems}
@@ -164,19 +95,12 @@ export function GenericModel({
         occupiedColor={modelConfig.occupiedColor}
       />
 
-      {/* Static items */}
+      {/* Static Items */}
       {modelConfig.staticItems.map((item) => {
         const geometry = nodes[item.geometryName];
         const material = materials[item.materialName];
 
         if (!geometry || !material) {
-          if (enableDebug) {
-            console.warn(
-              `Skipping static item ${item.name}: missing ${
-                !geometry ? "geometry" : "material"
-              }`
-            );
-          }
           return null;
         }
 
@@ -191,18 +115,13 @@ export function GenericModel({
         );
       })}
 
-      {/* Selectable items */}
+      {/* Selectable Items */}
       {modelConfig.selectableItems.map((item) => {
         const selected = selectedItems.includes(item.id);
         const occupied = occupiedItems.includes(item.id);
         const geometries = prepareItemGeometries(item);
 
         if (geometries.length === 0) {
-          if (enableDebug) {
-            console.warn(
-              `Skipping selectable item ${item.id}: no valid geometries`
-            );
-          }
           return null;
         }
 

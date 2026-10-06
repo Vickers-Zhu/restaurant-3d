@@ -17,9 +17,11 @@ const ModelContext = createContext(null);
  */
 export const ModelProvider = ({ children, initialModelKey = "kitchen" }) => {
   // Current model configuration
-  const [currentModelKey, setCurrentModelKey] = useState(initialModelKey);
+  const [currentModelKey, setCurrentModelKey] = useState(() =>
+    modelRegistry[initialModelKey] ? initialModelKey : "cafe"
+  );
   const [modelConfig, setModelConfig] = useState(
-    modelRegistry[initialModelKey]
+    modelRegistry[currentModelKey]
   );
 
   // Selection state

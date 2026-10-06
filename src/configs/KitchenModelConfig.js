@@ -3,6 +3,7 @@ import { RestaurantModelConfig } from "./ModelConfig.js";
 
 export const kitchenModelConfig = new RestaurantModelConfig({
   modelPath: "/kitchen.glb",
+  cameraFov: 40,
   selectableItems: [
     {
       type: "chair",
